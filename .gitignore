@@ -1,0 +1,5 @@
+# AI agent internals
+.agents/
+.superpowers/
+skills-lock.json
+docs/

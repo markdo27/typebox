@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RASTER.PRESS</title>
+  <meta name="description" content="RASTER.PRESS Pixel Typography Creative Playground — per-letter rotation, scale, skew, gradient, grain, animation and more.">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ── Top Navigation Bar ───────────────────────── -->
+  <nav class="topbar" role="banner">
+    <div class="brand">
+      <span class="brand-dot"></span>
+      <span class="brand-name">RASTER.PRESS</span>
+    </div>
+    <span class="topbar-hint">Click letter to select &nbsp;&middot;&nbsp; Drag to move &nbsp;&middot;&nbsp; Ctrl+S export</span>
+  </nav>
+
+  <!-- ── Main Application Layout ──────────────────── -->
+  <main class="main-layout" role="main">
+
+    <!-- Left Control Panel -->
+    <aside class="control-panel" role="complementary" aria-label="Controls">
+      <div class="panel-title">Controls</div>
+
+      <!-- ── Per-Letter Panel (hidden by default) ── -->
+      <div id="per-letter-panel" class="per-letter-panel" style="display:none;">
+        <div class="selected-badge">
+          <span class="badge-dot-sm"></span>
+          <span id="selected-badge-text">Letter selected</span>
+        </div>
+        <div class="per-letter-inner">
+          <div class="pl-header">✦ Per-Letter Overrides</div>
+
+          <div class="control-group">
+            <label class="control-label" for="pl-rotation">
+              Rotation
+              <span class="value-badge" id="pl-rotation-val">0°</span>
+            </label>
+            <input type="range" id="pl-rotation" class="slider" min="-180" max="180" value="0" step="1">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="pl-scale">
+              Scale
+              <span class="value-badge" id="pl-scale-val">1×</span>
+            </label>
+            <input type="range" id="pl-scale" class="slider" min="0.25" max="3" value="1" step="0.05">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="pl-skew">
+              Skew (Italic)
+              <span class="value-badge" id="pl-skew-val">0°</span>
+            </label>
+            <input type="range" id="pl-skew" class="slider" min="-45" max="45" value="0" step="1">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="pl-color">Fill Color Override</label>
+            <div class="color-swatch-wrap">
+              <input type="color" id="pl-color" class="color-input" value="#1a6bff">
+              <span class="color-hex" id="pl-color-hex">#1a6bff</span>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="pl-fill-char">Fill Character Override</label>
+            <input type="text" id="pl-fill-char" class="text-input" value="O" maxlength="2"
+                   placeholder="Single char" autocomplete="off" spellcheck="false">
+          </div>
+
+          <div class="pl-actions">
+            <button class="btn-pl-reset" id="reset-letter-btn">↺ Reset Letter</button>
+            <button class="btn-pl-deselect" id="deselect-btn">⤢ Deselect</button>
+          </div>
+        </div>
+
+        <!-- Global controls accordion header -->
+        <div class="accordion-header" id="global-accordion-header">
+          <span>Global Controls</span>
+          <span class="accordion-arrow">▾</span>
+        </div>
+      </div>
+
+      <!-- ── Global Controls (collapsible accordion) ── -->
+      <div id="global-controls-accordion">
+
+        <!-- Text Section -->
+        <div class="section-block">
+          <div class="section-label">Text</div>
+
+          <div class="control-group">
+            <label class="control-label" for="big-text">
+              Big Text
+              <span class="hint-inline">(drag letters to move)</span>
+            </label>
+            <input type="text" id="big-text" class="text-input" value="O" maxlength="10"
+                   placeholder="Type letters..." autocomplete="off" spellcheck="false">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="small-text">
+              Fill Character
+              <span class="hint-inline">(fills the grid cells)</span>
+            </label>
+            <input type="text" id="small-text" class="text-input" value="O"
+                   placeholder="Fill char" autocomplete="off" spellcheck="false">
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Grid Section -->
+        <div class="section-block">
+          <div class="section-label">Grid</div>
+
+          <div class="control-group">
+            <label class="control-label" for="pixel-height">
+              Pixel Height
+              <span class="value-badge" id="pixel-height-val">57px</span>
+            </label>
+            <input type="range" id="pixel-height" class="slider" min="20" max="110" value="57" step="1">
+            <p class="hint">Cell size — smaller = finer grid, more cells</p>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="width-ratio">
+              Width Ratio
+              <span class="value-badge" id="width-ratio-val">0.55</span>
+            </label>
+            <input type="range" id="width-ratio" class="slider" min="0.25" max="1.5" value="0.55" step="0.01">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="letter-spacing">
+              Letter Spacing
+              <span class="value-badge" id="letter-spacing-val">4px</span>
+            </label>
+            <input type="range" id="letter-spacing" class="slider" min="-20" max="60" value="4" step="1">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="ink-threshold">
+              Ink Threshold
+              <span class="value-badge" id="ink-threshold-val">100</span>
+            </label>
+            <input type="range" id="ink-threshold" class="slider" min="20" max="220" value="100" step="1">
+            <p class="hint">Lower = thicker strokes · Higher = thinner</p>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="fill-density">
+              Fill Density
+              <span class="value-badge" id="fill-density-val">1.00</span>
+            </label>
+            <input type="range" id="fill-density" class="slider" min="0.05" max="1" value="1" step="0.01">
+            <p class="hint">Fraction of background cells that render</p>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="canvas-padding">
+              Canvas Padding
+              <span class="value-badge" id="canvas-padding-val">0px</span>
+            </label>
+            <input type="range" id="canvas-padding" class="slider" min="0" max="80" value="0" step="2">
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Color Section -->
+        <div class="section-block">
+          <div class="section-label">Color</div>
+
+          <div class="color-row">
+            <div class="color-group">
+              <label class="control-label" for="bg-color">Background</label>
+              <div class="color-swatch-wrap">
+                <input type="color" id="bg-color" class="color-input" value="#000000">
+                <span class="color-hex" id="bg-color-hex">#000000</span>
+              </div>
+            </div>
+            <div class="color-group">
+              <label class="control-label" for="char-color">Fill Color</label>
+              <div class="color-swatch-wrap">
+                <input type="color" id="char-color" class="color-input" value="#1a6bff">
+                <span class="color-hex" id="char-color-hex">#1a6bff</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="hollow-color">Stroke Color</label>
+            <div class="color-swatch-wrap">
+              <input type="color" id="hollow-color" class="color-input" value="#ffffff">
+              <span class="color-hex" id="hollow-color-hex">#ffffff</span>
+            </div>
+          </div>
+
+          <!-- Gradient -->
+          <div class="control-group">
+            <label class="control-label">Gradient</label>
+            <div class="grad-pills">
+              <button class="grad-pill active" data-grad="none">None</button>
+              <button class="grad-pill" data-grad="linear-h">→ H</button>
+              <button class="grad-pill" data-grad="linear-v">↓ V</button>
+              <button class="grad-pill" data-grad="radial">◎ Radial</button>
+            </div>
+          </div>
+
+          <div id="gradient-colors" class="color-row" style="display:none;">
+            <div class="color-group">
+              <label class="control-label" for="gradient-a">From</label>
+              <div class="color-swatch-wrap">
+                <input type="color" id="gradient-a" class="color-input" value="#1a6bff">
+                <span class="color-hex" id="gradient-a-hex">#1a6bff</span>
+              </div>
+            </div>
+            <div class="color-group">
+              <label class="control-label" for="gradient-b">To</label>
+              <div class="color-swatch-wrap">
+                <input type="color" id="gradient-b" class="color-input" value="#a371f7">
+                <span class="color-hex" id="gradient-b-hex">#a371f7</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grain -->
+          <div class="control-group">
+            <label class="control-label" for="grain-amount">
+              Grain / Noise
+              <span class="value-badge" id="grain-amount-val">0.00</span>
+            </label>
+            <input type="range" id="grain-amount" class="slider" min="0" max="1" value="0" step="0.01">
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Presets Section -->
+        <div class="section-block">
+          <div class="section-label">Color Presets</div>
+          <div class="preset-pills">
+            <button class="preset-pill active" data-preset="Blue / Black">Blue</button>
+            <button class="preset-pill" data-preset="Red / White">Red</button>
+            <button class="preset-pill" data-preset="Gold / Black">Gold</button>
+            <button class="preset-pill" data-preset="Mono">Mono</button>
+            <button class="preset-pill" data-preset="Neon">Neon</button>
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Layout Section -->
+        <div class="section-block">
+          <div class="section-label">Layout</div>
+
+          <div class="control-group">
+            <label class="control-label">Layout Mode</label>
+            <div class="layout-toggle" role="group" aria-label="Layout mode">
+              <button class="toggle-btn active" data-layout="horizontal" id="layout-h">Horizontal</button>
+              <button class="toggle-btn" data-layout="vertical" id="layout-v">Vertical</button>
+              <button class="toggle-btn" data-layout="grid" id="layout-g">Grid</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label">Letter Alignment</label>
+            <div class="align-toggle" role="group" aria-label="Letter alignment">
+              <button class="toggle-btn" data-align="top">Top</button>
+              <button class="toggle-btn" data-align="center">Center</button>
+              <button class="toggle-btn active" data-align="bottom">Bottom</button>
+            </div>
+          </div>
+
+          <div class="control-group overlap-row">
+            <label class="control-label" for="allow-overlap">Allow Overlap</label>
+            <label class="switch">
+              <input type="checkbox" id="allow-overlap">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Font Section -->
+        <div class="section-block">
+          <div class="section-label">Font</div>
+
+          <div class="control-group">
+            <label class="control-label" for="font-weight">Fill Weight</label>
+            <select id="font-weight" class="select-input">
+              <option value="100">100 — Thin</option>
+              <option value="200">200 — ExtraLight</option>
+              <option value="300">300 — Light</option>
+              <option value="400" selected>400 — Regular</option>
+              <option value="500">500 — Medium</option>
+              <option value="600">600 — SemiBold</option>
+              <option value="700">700 — Bold</option>
+              <option value="800">800 — ExtraBold</option>
+              <option value="900">900 — Black</option>
+            </select>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="font-family">Font Family</label>
+            <select id="font-family" class="select-input">
+              <option value="Space Mono">Space Mono (monospace)</option>
+              <option value="Syne">Syne (artistic)</option>
+              <option value="Inter">Inter (humanist)</option>
+              <option value="Arial">Arial (sans-serif)</option>
+              <option value="Georgia">Georgia (serif)</option>
+              <option value="Impact">Impact (display)</option>
+              <option value="monospace">Monospace (system)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="panel-divider"></div>
+
+        <!-- Animation Section -->
+        <div class="section-block">
+          <div class="section-label">Animation</div>
+
+          <div class="control-group">
+            <label class="control-label">Mode</label>
+            <div class="anim-toggle" role="group" aria-label="Animation mode">
+              <button class="toggle-btn active" data-anim="none">Off</button>
+              <button class="toggle-btn" data-anim="color-cycle">Colors</button>
+              <button class="toggle-btn" data-anim="grain-shift">Grain</button>
+              <button class="toggle-btn" data-anim="both">Both</button>
+            </div>
+          </div>
+
+          <div id="anim-speed-wrap" style="display:none;">
+            <div class="control-group">
+              <label class="control-label" for="anim-speed">
+                Speed
+                <span class="value-badge" id="anim-speed-val">1.00×</span>
+              </label>
+              <input type="range" id="anim-speed" class="slider" min="0.1" max="4" value="1" step="0.1">
+            </div>
+          </div>
+
+          <button class="btn btn-snapshot" id="snapshot-btn" style="display:none;">
+            <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+              <path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/>
+              <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/>
+            </svg>
+            📷 Snapshot PNG
+          </button>
+        </div>
+
+      </div><!-- end global-controls-accordion -->
+
+      <!-- Panel spacer -->
+      <div class="panel-spacer"></div>
+
+      <!-- Action Buttons -->
+      <button class="btn btn-primary" id="download-btn">
+        <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+          <path d="M10 12.586L6.707 9.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L11 12.586V3a1 1 0 10-2 0v9.586z"/>
+          <path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/>
+        </svg>
+        Download PNG
+      </button>
+      <button class="btn btn-secondary" id="reset-btn">
+        Reset to Default
+      </button>
+    </aside>
+
+    <!-- Canvas Workspace -->
+    <section class="canvas-workspace" role="region" aria-label="Canvas preview">
+      <div class="canvas-header">
+        <span class="canvas-label" id="canvas-label">
+          Canvas: — × — px (auto-cropped)
+        </span>
+        <span class="canvas-hint">Click a letter to select · Drag to move · Esc to deselect</span>
+      </div>
+
+      <div class="canvas-container" id="canvas-container">
+        <div class="canvas-grid-bg"></div>
+        <canvas id="poster-canvas" aria-label="Poster preview canvas"></canvas>
+      </div>
+
+      <div class="play-hint" id="play-hint" aria-hidden="true">
+        <div class="play-icon">▶</div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Toast notification -->
+  <div class="toast" id="toast" role="alert" aria-live="polite"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
