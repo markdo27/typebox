@@ -1427,103 +1427,91 @@ class DitherPatEngine {
   }
 
   async loadSFPatternSVG(file) {
+    const [svgText, dataURL] = await Promise.all([
+      file.text(),
+      new Promise((res, rej) => { const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file); })
+    ]);
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = new Image();
-        img.onload = () => { this.sfPatternSVG = img; this.sfPatternDataURL = e.target.result; resolve(img); };
-        img.onerror = reject;
-        img.src = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        img._rawText = svgText;           // keep raw SVG for vector export
+        this.sfPatternSVG    = img;
+        this.sfPatternDataURL = dataURL;
+        resolve(img);
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      img.onerror = reject;
+      img.src = dataURL;
     });
   }
 
   async loadSFBodySVG(file) {
+    const [svgText, dataURL] = await Promise.all([
+      file.text(),
+      new Promise((res, rej) => { const r = new FileReader(); r.onload = e => res(e.target.result); r.onerror = rej; r.readAsDataURL(file); })
+    ]);
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = new Image();
-        img.onload = () => {
-          this.sfBodySVG    = img;
-          this.sfBodyDataURL = e.target.result;
-          this._rasterizeBodySVG();
-          resolve(img);
-        };
-        img.onerror = reject;
-        img.src = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        img._rawText = svgText;           // keep raw SVG for vector export
+        this.sfBodySVG     = img;
+        this.sfBodyDataURL = dataURL;
+        this._rasterizeBodySVG();
+        resolve(img);
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      img.onerror = reject;
+      img.src = dataURL;
     });
   }
 
   /**
-   * SVG Export — Shape Fill mode.
+   * SVG Export — Shape Fill mode (fully vector).
    *
-   * IMPORTANT: Browsers block "SVG-inside-SVG" via data: URLs for security
-   * (the embedded <image href="data:image/svg+xml;..."> renders as nothing).
-   * Fix: pre-rasterize both SVGs to PNG on temporary canvases — with tinting
-   * already baked in — then embed those PNG data URLs instead.
+   * Body SVG  → <symbol id="dp-sf-body"> + <use> covering full canvas
+   * Pattern SVG → <symbol id="dp-sf-pat"> + grid of <use> elements clipped to body
+   * Tinting   → feFlood filter applied to <use> elements (no rasterization)
    */
   _svgExportShapeFill(lines, cw, ch) {
     const f = n => n.toFixed(2);
 
-    /* ── 1. Pre-rasterize body SVG → PNG (tinting baked in) ── */
-    let bodyPNG = null;
-    if (this.sfBodySVG) {
-      const res  = this.sfBodyRes * 2;                    // 1024 px — high enough for sharp export
-      const bTmp = document.createElement('canvas');
-      bTmp.width = res; bTmp.height = res;
-      const bCtx = bTmp.getContext('2d');
-      bCtx.drawImage(this.sfBodySVG, 0, 0, res, res);
-      if (this.sfTintBody) {
-        bCtx.globalCompositeOperation = 'source-atop';
-        bCtx.globalAlpha = this.sfBodyOpacity;            // bake opacity into the PNG
-        bCtx.fillStyle   = this.sfBodyColor;
-        bCtx.fillRect(0, 0, res, res);
-        bCtx.globalCompositeOperation = 'source-over';
-        bCtx.globalAlpha = 1;
+    /* ── 1. Body layer ── */
+    if (this.sfShowBody && this.sfBodySVG) {
+      const opAttr = this.sfBodyOpacity < 1 ? ` opacity="${this.sfBodyOpacity.toFixed(2)}"` : '';
+      if (this.sfBodySVG._rawText) {
+        // Vector body: use the #dp-sf-body symbol defined in <defs>
+        const tintFilt = this.sfTintBody
+          ? ` filter="url(#dp-sf-body-tint)"`
+          : '';
+        // Inline body-tint filter if needed (separate id from pattern tint)
+        if (this.sfTintBody) {
+          lines.push(`<defs><filter id="dp-sf-body-tint"><feFlood flood-color="${this.sfBodyColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter></defs>`);
+        }
+        lines.push(`<use href="#dp-sf-body" x="0" y="0" width="${cw}" height="${ch}"${tintFilt}${opAttr}/>`);
+      } else {
+        // Fallback: rasterized PNG (old behavior for non-text-loaded bodies)
+        const bTmp = document.createElement('canvas');
+        bTmp.width = cw; bTmp.height = ch;
+        const bCtx = bTmp.getContext('2d');
+        bCtx.drawImage(this.sfBodySVG, 0, 0, cw, ch);
+        if (this.sfTintBody) {
+          bCtx.globalCompositeOperation = 'source-atop';
+          bCtx.fillStyle = this.sfBodyColor;
+          bCtx.fillRect(0, 0, cw, ch);
+        }
+        const opAttrFb = this.sfBodyOpacity < 1 ? ` opacity="${this.sfBodyOpacity.toFixed(2)}"` : '';
+        lines.push(`<image href="${bTmp.toDataURL('image/png')}" x="0" y="0" width="${cw}" height="${ch}"${opAttrFb}/>`);
       }
-      bodyPNG = bTmp.toDataURL('image/png');
     }
 
-    /* ── 2. Pre-rasterize pattern SVG → PNG (rotation + tinting baked in) ── */
-    let patternPNG = null;
-    if (this.sfPatternSVG) {
-      const res  = 256;
-      const pTmp = document.createElement('canvas');
-      pTmp.width = res; pTmp.height = res;
-      const pCtx = pTmp.getContext('2d');
-      pCtx.translate(res * 0.5, res * 0.5);
-      if (this.sfPatternRotation) pCtx.rotate(this.sfPatternRotation * Math.PI / 180);
-      pCtx.drawImage(this.sfPatternSVG, -res * 0.5, -res * 0.5, res, res);
-      if (this.sfTintPattern) {
-        pCtx.globalCompositeOperation = 'source-atop';
-        pCtx.fillStyle = this.dotColor;
-        pCtx.fillRect(-res * 0.5, -res * 0.5, res, res);
-        pCtx.globalCompositeOperation = 'source-over';
-      }
-      patternPNG = pTmp.toDataURL('image/png');
-    }
+    if (!this.sfBodyData) return;   // body mask not ready
 
-    /* ── 3. Emit body layer ── */
-    if (this.sfShowBody && bodyPNG) {
-      // Opacity was baked into the PNG if tintBody; keep raw opacity only when not tinting
-      const opAttr = (!this.sfTintBody && this.sfBodyOpacity < 1)
-        ? ` opacity="${this.sfBodyOpacity.toFixed(2)}"` : '';
-      lines.push(`<image href="${bodyPNG}" x="0" y="0" width="${cw}" height="${ch}"${opAttr}/>`);
-    }
-
-    if (!this.sfBodyData) return;   // body mask not ready — nothing to tile
-
-    /* ── 4. Grid of pattern tiles ── */
-    const cols  = this.sfGridCols;
-    const rows  = Math.max(1, Math.round(cols * ch / cw));
-    const cellW = cw / cols;
-    const cellH = ch / rows;
+    /* ── 2. Grid of pattern tiles ── */
+    const cols   = this.sfGridCols;
+    const rows   = Math.max(1, Math.round(cols * ch / cw));
+    const cellW  = cw / cols;
+    const cellH  = ch / rows;
     const opAttr = this.dotOpacity < 1 ? ` opacity="${this.dotOpacity.toFixed(2)}"` : '';
+    const tintFilt = (this.sfTintPattern && this.sfPatternSVG) ? ' filter="url(#dp-sf-tint)"' : '';
+    const fillAttr = (!this.sfPatternSVG) ? ` fill="${this.dotColor}"` : '';
 
     const shapes = [];
     for (let r = 0; r < rows; r++) {
@@ -1537,11 +1525,14 @@ class DitherPatEngine {
         const sx = px - sw * 0.5;
         const sy = py - sh * 0.5;
 
-        if (patternPNG) {
-          // PNG already has tinting baked in — no filter needed
-          shapes.push(`<image href="${patternPNG}" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"/>`);
+        if (this.sfPatternSVG) {
+          // Vector: <use> referencing the #dp-sf-pat symbol in <defs>
+          const rotAttr = this.sfPatternRotation
+            ? ` transform="rotate(${this.sfPatternRotation},${f(px)},${f(py)})"`
+            : '';
+          shapes.push(`<use href="#dp-sf-pat" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"${tintFilt}${rotAttr}/>`);
         } else {
-          // Fallback: circle shape
+          // Fallback: built-in circle
           const r2 = Math.min(cellW, cellH) * 0.5 * this.sfPatternScale;
           shapes.push(`<circle cx="${f(px)}" cy="${f(py)}" r="${f(r2)}"/>`);
         }
@@ -1549,9 +1540,6 @@ class DitherPatEngine {
     }
 
     if (shapes.length > 0) {
-      // For PNG tiles: wrap in group with dotOpacity only (tinting already baked in)
-      // For circle fallback: also add fill color
-      const fillAttr = patternPNG ? '' : ` fill="${this.dotColor}"`;
       lines.push(`<g${fillAttr}${opAttr}>${shapes.join('')}</g>`);
     }
   }
@@ -1715,28 +1703,35 @@ class DitherPatEngine {
 
   /** Load SVG file and use it as the shape unit. */
   async loadSVGShape(file) {
+    // Read raw SVG text (for vector export) and data-URL (for canvas) in parallel
+    const [svgText, dataURL] = await Promise.all([
+      file.text(),
+      new Promise((res, rej) => {
+        const r = new FileReader();
+        r.onload  = e => res(e.target.result);
+        r.onerror = rej;
+        r.readAsDataURL(file);
+      })
+    ]);
     return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = e => {
-        const img = new Image();
-        img.onload  = () => {
-          this.svgImage   = img;
-          this.svgDataURL = e.target.result;
-          this.svgCache.clear();
-          this._lpDirty = true;
-          resolve(img);
-        };
-        img.onerror = reject;
-        img.src = e.target.result;
+      const img = new Image();
+      img.onload = () => {
+        this.svgImage   = img;
+        this.svgDataURL = dataURL;
+        this.svgRawText = svgText;   // raw SVG markup — used for true vector export
+        this.svgCache.clear();
+        this._lpDirty = true;
+        resolve(img);
       };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
+      img.onerror = reject;
+      img.src = dataURL;
     });
   }
 
   clearSVGShape() {
     this.svgImage   = null;
     this.svgDataURL = null;
+    this.svgRawText = null;
     this.svgCache.clear();
     this._lpDirty = true;
   }
@@ -1792,19 +1787,69 @@ class DitherPatEngine {
     const ch      = this.canvas.height;
     const imgData = this._sampleSource();
     const lines   = [];
+    const f       = n => n.toFixed(2);
 
     lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
-    lines.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${cw} ${ch}" width="${cw}" height="${ch}">`);
+    lines.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${cw} ${ch}" width="${cw}" height="${ch}">`);
 
-    // Defs: tint filter for uploaded SVG shapes
-    const needsTint = (this.svgImage && this.tintSVG);
-    const needsSFTint = (this.renderMode === 'shapefill' && this.sfPatternSVG && this.sfTintPattern);
-    if (needsTint || needsSFTint) {
-      const defs = [];
-      if (needsTint)   defs.push(`<filter id="dp-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
-      if (needsSFTint) defs.push(`<filter id="dp-sf-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
-      lines.push(`<defs>${defs.join('')}</defs>`);
+    /* ── <defs> block ─────────────────────────────────────────────
+       • Tint filter(s)  – feFlood + composite
+       • #dp-shape       – uploaded halftone/guided SVG as a symbol
+       • #dp-sf-pattern  – uploaded shape-fill pattern SVG as symbol
+       • #dp-sf-body     – uploaded shape-fill body SVG as symbol
+    ─────────────────────────────────────────────────────────────── */
+    const defs = [];
+
+    // Helper: extract inner SVG content from raw text, strip outer <svg> wrapper
+    const svgInner = rawText => {
+      if (!rawText) return '';
+      // Remove XML declaration and strip outer <svg …> … </svg> wrapper
+      return rawText
+        .replace(/<\?xml[^>]*\?>/i, '')
+        .replace(/<!--[\s\S]*?-->/g, '')
+        .trim()
+        .replace(/^<svg[^>]*>/i, '')
+        .replace(/<\/svg>\s*$/i, '')
+        .trim();
+    };
+
+    // Tint filter for halftone/guided shape SVG
+    const hasSVGShape   = !!(this.svgImage && this.svgRawText);
+    const hasSFPattern  = (this.renderMode === 'shapefill' && this.sfPatternSVG);
+    const hasSFBody     = (this.renderMode === 'shapefill' && this.sfBodySVG);
+    const needsShapeTint = hasSVGShape && this.tintSVG;
+    const needsSFTint    = hasSFPattern && this.sfTintPattern;
+
+    if (needsShapeTint) {
+      defs.push(`<filter id="dp-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
     }
+    if (needsSFTint) {
+      defs.push(`<filter id="dp-sf-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
+    }
+
+    // Shape symbol (halftone / guided / low-poly custom shape)
+    if (hasSVGShape) {
+      // Parse viewBox from raw SVG to set symbol viewBox
+      const vbMatch = this.svgRawText.match(/viewBox=["']([^"']+)["']/i);
+      const vbAttr  = vbMatch ? ` viewBox="${vbMatch[1]}"` : ' viewBox="0 0 100 100"';
+      defs.push(`<symbol id="dp-shape"${vbAttr} preserveAspectRatio="xMidYMid meet">${svgInner(this.svgRawText)}</symbol>`);
+    }
+
+    // Shape-fill pattern symbol
+    if (hasSFPattern && this.sfPatternSVG._rawText) {
+      const vbMatch = this.sfPatternSVG._rawText.match(/viewBox=["']([^"']+)["']/i);
+      const vbAttr  = vbMatch ? ` viewBox="${vbMatch[1]}"` : ' viewBox="0 0 100 100"';
+      defs.push(`<symbol id="dp-sf-pat"${vbAttr} preserveAspectRatio="xMidYMid meet">${svgInner(this.sfPatternSVG._rawText)}</symbol>`);
+    }
+
+    // Shape-fill body symbol
+    if (hasSFBody && this.sfBodySVG._rawText) {
+      const vbMatch = this.sfBodySVG._rawText.match(/viewBox=["']([^"']+)["']/i);
+      const vbAttr  = vbMatch ? ` viewBox="${vbMatch[1]}"` : ' viewBox="0 0 100 100"';
+      defs.push(`<symbol id="dp-sf-body"${vbAttr} preserveAspectRatio="xMidYMid meet">${svgInner(this.sfBodySVG._rawText)}</symbol>`);
+    }
+
+    if (defs.length) lines.push(`<defs>${defs.join('')}</defs>`);
 
     // Background rectangle
     lines.push(`<rect width="${cw}" height="${ch}" fill="${this.bgColor}"/>`);
@@ -1839,16 +1884,17 @@ class DitherPatEngine {
     const hw    = cellW * 0.5, hh = cellH * 0.5;
     const f     = n => n.toFixed(2);
 
-    // Uploaded SVG shape → <image> element
+    // Uploaded SVG shape → <use href="#dp-shape"> (true vector via symbol defined in <defs>)
     if (this.svgImage) {
       const sz   = (state < 6 ? frac : 1) * this.dotScale;
       const sw   = cellW * sz, sh = cellH * sz;
       const sx   = cx - sw * 0.5, sy = cy - sh * 0.5;
       const filt = this.tintSVG ? ' filter="url(#dp-tint)"' : '';
-      return `<image href="${this.svgDataURL}" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"${filt}/>`;
+      const rot  = this.svgRotation ? ` transform="rotate(${this.svgRotation},${f(cx)},${f(cy)})"` : '';
+      return `<use href="#dp-shape" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"${filt}${rot}/>`;
     }
 
-    // Built-in shapes
+    // Built-in shapes (already vector — no change)
     switch (this.shapeStyle) {
       case 'circle':
         if (state === 6) return `<rect x="${f(cx-hw)}" y="${f(cy-hh)}" width="${f(cellW)}" height="${f(cellH)}"/>`;
@@ -1871,7 +1917,6 @@ class DitherPatEngine {
       case 'ring': {
         if (state === 6) return `<rect x="${f(cx-hw)}" y="${f(cy-hh)}" width="${f(cellW)}" height="${f(cellH)}"/>`;
         if (state <= 1)  return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>`;
-        // Donut: outer circle + inner circle filled with bg color
         const inner = Math.max(0, r * (1 - frac * 0.6));
         return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>` +
                `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(inner)}" fill="${this.bgColor}"/>`;
@@ -1924,13 +1969,14 @@ class DitherPatEngine {
         opAttr = ` opacity="${(lum / 255 * this.dotOpacity).toFixed(2)}"`;
       }
 
-      // If custom SVG shape: clip triangle region and draw image inside
+      // Custom SVG shape: clip triangle, fill with vector <use> of #dp-shape
       if (this.svgImage) {
         const clipId = `cl${i}`;
-        const pts = `${f(a.x)},${f(a.y)} ${f(b.x)},${f(b.y)} ${f(c.x)},${f(c.y)}`;
-        const filt = this.tintSVG ? ` filter="url(#dp-tint)"` : '';
+        const pts    = `${f(a.x)},${f(a.y)} ${f(b.x)},${f(b.y)} ${f(c.x)},${f(c.y)}`;
+        const filt   = this.tintSVG ? ` filter="url(#dp-tint)"` : '';
         lines.push(`<clipPath id="${clipId}"><polygon points="${pts}"/></clipPath>`);
-        lines.push(`<image href="${this.svgDataURL}" x="0" y="0" width="${cw}" height="${ch}" clip-path="url(#${clipId})"${filt}${opAttr}/>`);
+        // Tile the symbol across the full canvas, clipped to triangle
+        lines.push(`<use href="#dp-shape" x="0" y="0" width="${cw}" height="${ch}" clip-path="url(#${clipId})"${filt}${opAttr}/>`);
         if (this.lpShowEdges) {
           lines.push(`<polygon points="${pts}" fill="none" stroke="${this.bgColor}" stroke-width="0.5"/>`);
         }
@@ -1983,7 +2029,8 @@ class DitherPatEngine {
         let shapeEl;
         if (this.svgImage) {
           const filt = this.tintSVG ? ' filter="url(#dp-tint)"' : '';
-          shapeEl = `<image href="${this.svgDataURL}" x="${f(-hw)}" y="${f(-hh)}" width="${f(hw*2)}" height="${f(hh*2)}"${filt}/>`;
+          // <use> references the #dp-shape symbol — true vector, no raster
+          shapeEl = `<use href="#dp-shape" x="${f(-hw)}" y="${f(-hh)}" width="${f(hw*2)}" height="${f(hh*2)}"${filt}/>`;
         } else {
           shapeEl = this._svgBuiltinLocal(hw, hh);
         }
