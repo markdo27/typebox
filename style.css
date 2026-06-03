@@ -20,9 +20,9 @@
   --accent-light:    #7aabff;
   --accent-glow:     rgba(77, 143, 255, 0.35);
   --accent-glow-sm:  rgba(77, 143, 255, 0.14);
-  --text-primary:    #e2e8f0;
-  --text-secondary:  #64748b;
-  --text-hint:       #2d3a52;
+  --text-primary:    #e2e8f0;       /* headings, brand */
+  --text-secondary:  #8899b8;       /* control labels — lifted for legibility */
+  --text-hint:       #3d4f6a;       /* hints, values — lifted from #2d3a52 */
   --input-bg:        rgba(255, 255, 255, 0.04);
   --slider-bg:       rgba(77, 143, 255, 0.15);
 
@@ -33,10 +33,30 @@
   --radius-md:       8px;
   --radius-lg:       12px;
 
+  /* ── Type Scale (Major Third × 1.25) ─────────────────────────────── */
+  /* 11px → 12px → 13px → 14px → 16px */
+  --text-xs:    0.688rem;   /* 11px  hints, values, hex, section labels */
+  --text-sm:    0.75rem;    /* 12px  toggle/pill buttons, canvas label  */
+  --text-base:  0.813rem;   /* 13px  control labels, select, input      */
+  --text-md:    0.875rem;   /* 14px  primary/secondary action buttons   */
+  --text-brand: 1rem;       /* 16px  brand wordmark                     */
+
+  /* ── Tracking (letter-spacing per typographic role) ─────────────── */
+  /* Rule: uppercase → wider; mixed-case → tighter/neutral             */
+  --track-tight:  0.01em;   /* mixed-case labels, body-like text        */
+  --track-normal: 0.04em;   /* buttons, pills (short mixed-case)        */
+  --track-caps:   0.10em;   /* all-caps section labels, panel title     */
+  --track-brand:  0.15em;   /* all-caps brand wordmark                  */
+
+  /* ── Line Height ─────────────────────────────────────────────────── */
+  --lh-tight:  1.2;    /* single-line labels, badges                    */
+  --lh-normal: 1.45;   /* multi-line hints                              */
+  --lh-ui:     1;      /* buttons, toggles (vertically centred)         */
+
   /* Typography */
-  --font-ui:         'Inter', system-ui, sans-serif;
-  --font-brand:      'Syne', sans-serif;
-  --font-mono:       'Space Mono', monospace;
+  --font-ui:    'Inter', system-ui, sans-serif;   /* humanist sans — UI */
+  --font-brand: 'Syne', sans-serif;               /* display — brand only */
+  --font-mono:  'Space Mono', monospace;          /* code/values/hex */
 
   /* Motion */
   --ease:   cubic-bezier(0.4, 0, 0.2, 1);
@@ -97,15 +117,19 @@ body {
 .brand-name {
   font-family: var(--font-brand);
   font-weight: 800;
-  font-size: 0.95rem;
+  font-size: var(--text-brand);         /* 16px — display headline */
   color: var(--text-primary);
-  letter-spacing: 0.12em;
+  letter-spacing: var(--track-brand);   /* 0.15em — uppercase must breathe */
+  line-height: var(--lh-tight);
 }
 
 .topbar-hint {
-  font-size: 0.68rem;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);            /* 11px — passive guidance */
+  font-weight: 400;
   color: var(--text-hint);
-  letter-spacing: 0.02em;
+  letter-spacing: 0;                    /* lowercase — zero tracking */
+  line-height: var(--lh-tight);
 }
 
 /* ── Main Layout ─────────────────────────────────────────────────────── */
@@ -136,11 +160,13 @@ body {
 
 /* ── Panel Elements ──────────────────────────────────────────────────── */
 .panel-title {
-  font-size: 0.65rem;
+  font-family: var(--font-ui);          /* Inter — not brand font */
+  font-size: var(--text-xs);            /* 11px — structural label */
   font-weight: 600;
   color: var(--text-hint);
-  letter-spacing: 0.12em;
+  letter-spacing: var(--track-caps);    /* 0.10em — all-caps positive tracking */
   text-transform: uppercase;
+  line-height: var(--lh-tight);
   margin-bottom: 14px;
   padding-bottom: 10px;
   border-bottom: 1px solid var(--border-subtle);
@@ -163,10 +189,12 @@ body {
 }
 
 .control-label {
-  font-size: 0.7rem;
+  font-family: var(--font-ui);
+  font-size: var(--text-base);          /* 13px — readable at panel width */
   font-weight: 500;
   color: var(--text-secondary);
-  letter-spacing: 0.01em;
+  letter-spacing: var(--track-tight);   /* 0.01em — mixed-case, tight */
+  line-height: var(--lh-tight);         /* 1.2 */
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -174,23 +202,30 @@ body {
 }
 
 .hint-inline {
-  font-size: 0.63rem;
-  color: var(--text-hint);
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);            /* 11px */
   font-weight: 400;
+  color: var(--text-hint);
+  letter-spacing: 0;
+  line-height: var(--lh-normal);
 }
 
 .hint {
-  font-size: 0.63rem;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);            /* 11px */
+  font-weight: 400;
   color: var(--text-hint);
-  line-height: 1.4;
+  letter-spacing: 0;
+  line-height: var(--lh-normal);        /* 1.45 — multi-line comfortable */
 }
 
 .value-badge {
   display: inline-block;
-  background: transparent;
-  color: var(--text-secondary);
-  font-family: var(--font-mono);
-  font-size: 0.67rem;
+  font-family: var(--font-mono);        /* Space Mono — data/numbers only */
+  font-size: var(--text-xs);            /* 11px */
+  font-weight: 400;
+  color: var(--text-hint);
+  letter-spacing: 0;                    /* monospace — no tracking needed */
   margin-left: auto;
   white-space: nowrap;
 }
@@ -203,19 +238,17 @@ body {
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-sm);
   color: var(--text-primary);
-  font-family: var(--font-mono);
-  font-size: 0.88rem;
+  font-family: var(--font-mono);        /* monospace — user enters characters */
+  font-size: var(--text-base);          /* 13px */
   font-weight: 400;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;               /* monospace with slight breathing */
+  line-height: var(--lh-tight);
   outline: none;
   transition: border-color var(--dur-sm) var(--ease);
 }
 
-.text-input:focus {
-  border-color: rgba(77, 143, 255, 0.4);
-}
-
-.text-input::placeholder { color: var(--text-hint); }
+.text-input:focus { border-color: rgba(77, 143, 255, 0.4); }
+.text-input::placeholder { color: var(--text-hint); font-style: italic; }
 
 /* ── Slider ──────────────────────────────────────────────────────────── */
 .slider {
@@ -299,10 +332,10 @@ body {
 .color-input::-webkit-color-swatch         { border: none; border-radius: 3px; }
 
 .color-hex {
-  font-family: var(--font-mono);
-  font-size: 0.63rem;
+  font-family: var(--font-mono);        /* Space Mono — hex codes are data */
+  font-size: var(--text-xs);            /* 11px */
   color: var(--text-hint);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.02em;               /* minimal breathing for mono hex */
   user-select: none;
 }
 
@@ -426,29 +459,30 @@ body {
 .canvas-header {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 9px 20px;
-  border-bottom: 1px solid rgba(15, 30, 80, 0.8);
+  gap: 12px;
+  padding: 7px 16px;
+  border-bottom: 1px solid var(--border-subtle);
   flex-shrink: 0;
-  background: rgba(3, 6, 15, 0.6);
+  background: var(--bg-deep);
   position: relative;
   z-index: 1;
 }
 
 .canvas-label {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--accent-light);
-  background: rgba(30, 107, 255, 0.06);
-  border: 1px solid rgba(30, 107, 255, 0.2);
-  padding: 4px 12px;
-  border-radius: 4px;
-  letter-spacing: 0.03em;
+  font-family: var(--font-mono);        /* Space Mono — technical data */
+  font-size: var(--text-xs);            /* 11px */
+  font-weight: 400;
+  color: var(--text-hint);
+  letter-spacing: 0.02em;               /* minimal breathing for mono */
 }
 
 .canvas-hint {
-  font-size: 0.68rem;
+  font-family: var(--font-ui);          /* Inter — instructional text */
+  font-size: var(--text-xs);            /* 11px */
+  font-weight: 400;
   color: var(--text-hint);
+  letter-spacing: 0;                    /* mixed-case, zero tracking */
+  line-height: var(--lh-tight);
   margin-left: auto;
 }
 
@@ -565,86 +599,6 @@ body {
   opacity: 0.4;
 }
 
-/* ── Accordion ──────────────────────────────────────────────────────────── */
-.accordion-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 6px 8px;
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  cursor: pointer;
-  font-size: 0.68rem;
-  color: var(--text-hint);
-  font-weight: 600;
-  margin-bottom: 8px;
-  transition: color var(--dur-sm) var(--ease), border-color var(--dur-sm) var(--ease);
-  user-select: none;
-  letter-spacing: 0.04em;
-}
-
-.accordion-header:hover { color: var(--text-secondary); border-color: rgba(255,255,255,0.12); }
-
-.accordion-arrow { transition: transform var(--dur-sm) var(--ease); }
-
-#global-controls-accordion.collapsed { display: none; }
-
-#global-controls-accordion.collapsed + .accordion-header .accordion-arrow,
-.per-letter-panel:not([style*="display: none"]) .accordion-header .accordion-arrow {
-  transform: rotate(-90deg);
-}
-
-/* ── Gradient Pills ───────────────────────────────────────────────────── */
-.grad-pills { display: flex; gap: 4px; }
-
-.grad-pill {
-  flex: 1;
-  padding: 6px 3px;
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-hint);
-  font-size: 0.68rem;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: center;
-  transition: color var(--dur-sm) var(--ease), border-color var(--dur-sm) var(--ease), background var(--dur-sm) var(--ease);
-  font-family: var(--font-ui);
-  white-space: nowrap;
-}
-
-.grad-pill:hover:not(.active) { color: var(--text-secondary); border-color: rgba(255,255,255,0.1); }
-
-.grad-pill.active {
-  background: rgba(77, 143, 255, 0.1);
-  border-color: rgba(77, 143, 255, 0.35);
-  color: var(--accent-light);
-}
-
-/* ── Preset Pills ──────────────────────────────────────────────────────────── */
-.preset-pills { display: flex; gap: 4px; flex-wrap: wrap; }
-
-.preset-pill {
-  padding: 5px 9px;
-  background: transparent;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  color: var(--text-hint);
-  font-size: 0.68rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: color var(--dur-sm) var(--ease), border-color var(--dur-sm) var(--ease), background var(--dur-sm) var(--ease);
-  font-family: var(--font-ui);
-}
-
-.preset-pill:hover:not(.active) { color: var(--text-secondary); border-color: rgba(255,255,255,0.1); }
-
-.preset-pill.active {
-  background: rgba(77, 143, 255, 0.1);
-  border-color: rgba(77, 143, 255, 0.35);
-  color: var(--accent-light);
-}
 
 /* ── Animations ──────────────────────────────────────────────────────── */
 @keyframes fade-in {
@@ -663,11 +617,13 @@ body {
 }
 
 .section-label {
-  font-size: 0.63rem;
-  font-weight: 700;
+  font-family: var(--font-ui);
+  font-size: var(--text-xs);            /* 11px — structural label */
+  font-weight: 600;
   color: var(--text-hint);
   text-transform: uppercase;
-  letter-spacing: 0.1em;
+  letter-spacing: var(--track-caps);    /* 0.10em — all-caps MUST have positive tracking */
+  line-height: var(--lh-tight);
   margin-bottom: 10px;
   margin-top: 4px;
 }
@@ -750,6 +706,8 @@ body {
 }
 .btn-pl-deselect:hover { color: var(--text-secondary); }
 
+/* ── Accordion ───────────────────────────────────────────────────────── */
+.accordion-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -764,6 +722,7 @@ body {
   margin-bottom: 8px;
   transition: all var(--dur-sm) var(--ease);
   user-select: none;
+  letter-spacing: 0.04em;
 }
 
 .accordion-header:hover {
@@ -772,15 +731,28 @@ body {
 }
 
 .accordion-arrow {
-  transition: transform var(--dur-sm) var(--ease);
+  display: inline-block;
+  transition: transform var(--dur-md) var(--ease);
+}
+
+/* Smooth height-based collapse (JS toggles .collapsed class) */
+#global-controls-accordion {
+  overflow: hidden;
+  max-height: 2000px;
+  transition: max-height 0.32s cubic-bezier(0.4, 0, 0.2, 1),
+              opacity    0.22s var(--ease);
+  opacity: 1;
 }
 
 #global-controls-accordion.collapsed {
-  display: none;
+  max-height: 0;
+  opacity: 0;
+  pointer-events: none;
 }
 
-#global-controls-accordion.collapsed + .accordion-header .accordion-arrow,
-.per-letter-panel:not([style*="display: none"]) .accordion-header .accordion-arrow {
+/* Rotate arrow when collapsed */
+#global-controls-accordion.collapsed ~ .accordion-header .accordion-arrow,
+.per-letter-panel:not([style*='display: none']) .accordion-header .accordion-arrow {
   transform: rotate(-90deg);
 }
 

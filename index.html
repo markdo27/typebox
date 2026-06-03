@@ -19,7 +19,7 @@
       <span class="brand-dot"></span>
       <span class="brand-name">RASTER.PRESS</span>
     </div>
-    <span class="topbar-hint">Click letter to select &nbsp;&middot;&nbsp; Drag to move &nbsp;&middot;&nbsp; Ctrl+S export</span>
+    <span class="topbar-hint">Click letter to select &nbsp;&middot;&nbsp; Drag to move &nbsp;&middot;&nbsp; Arrow keys nudge &nbsp;&middot;&nbsp; Ctrl+S export</span>
   </nav>
 
   <!-- ── Main Application Layout ──────────────────── -->
@@ -56,7 +56,8 @@
 
           <div class="control-group">
             <label class="control-label" for="pl-skew">
-              Skew (Italic)
+              Skew
+              <span class="hint-inline">(simulates italic)</span>
               <span class="value-badge" id="pl-skew-val">0°</span>
             </label>
             <input type="range" id="pl-skew" class="slider" min="-45" max="45" value="0" step="1">
@@ -98,20 +99,20 @@
 
           <div class="control-group">
             <label class="control-label" for="big-text">
-              Big Text
+              Text
               <span class="hint-inline">(drag letters to move)</span>
             </label>
             <input type="text" id="big-text" class="text-input" value="O" maxlength="10"
-                   placeholder="Type letters..." autocomplete="off" spellcheck="false">
+                   placeholder="Type letters…" autocomplete="off" spellcheck="false">
           </div>
 
           <div class="control-group">
             <label class="control-label" for="small-text">
-              Fill Character
-              <span class="hint-inline">(fills the grid cells)</span>
+              Counter Char
+              <span class="hint-inline">(fills each cell)</span>
             </label>
             <input type="text" id="small-text" class="text-input" value="O"
-                   placeholder="Fill char" autocomplete="off" spellcheck="false">
+                   placeholder="Single char" autocomplete="off" spellcheck="false">
           </div>
         </div>
 
@@ -123,16 +124,16 @@
 
           <div class="control-group">
             <label class="control-label" for="pixel-height">
-              Pixel Height
+              Cell Size
               <span class="value-badge" id="pixel-height-val">57px</span>
             </label>
             <input type="range" id="pixel-height" class="slider" min="20" max="110" value="57" step="1">
-            <p class="hint">Cell size — smaller = finer grid, more cells</p>
+            <p class="hint">Grid cell size — smaller = finer raster, more cells</p>
           </div>
 
           <div class="control-group">
             <label class="control-label" for="width-ratio">
-              Width Ratio
+              Aspect Ratio
               <span class="value-badge" id="width-ratio-val">0.55</span>
             </label>
             <input type="range" id="width-ratio" class="slider" min="0.25" max="1.5" value="0.55" step="0.01">
@@ -140,7 +141,8 @@
 
           <div class="control-group">
             <label class="control-label" for="letter-spacing">
-              Letter Spacing
+              Tracking
+              <span class="hint-inline">(letter spacing)</span>
               <span class="value-badge" id="letter-spacing-val">4px</span>
             </label>
             <input type="range" id="letter-spacing" class="slider" min="-20" max="60" value="4" step="1">
@@ -148,7 +150,7 @@
 
           <div class="control-group">
             <label class="control-label" for="ink-threshold">
-              Ink Threshold
+              Stroke Threshold
               <span class="value-badge" id="ink-threshold-val">100</span>
             </label>
             <input type="range" id="ink-threshold" class="slider" min="20" max="220" value="100" step="1">
@@ -157,11 +159,11 @@
 
           <div class="control-group">
             <label class="control-label" for="fill-density">
-              Fill Density
+              Counter Fill
               <span class="value-badge" id="fill-density-val">1.00</span>
             </label>
             <input type="range" id="fill-density" class="slider" min="0.05" max="1" value="1" step="0.01">
-            <p class="hint">Fraction of background cells that render</p>
+            <p class="hint">Fraction of counter (whitespace) cells rendered</p>
           </div>
 
           <div class="control-group">
@@ -263,8 +265,8 @@
           <div class="section-label">Layout</div>
 
           <div class="control-group">
-            <label class="control-label">Layout Mode</label>
-            <div class="layout-toggle" role="group" aria-label="Layout mode">
+            <label class="control-label">Arrangement</label>
+            <div class="layout-toggle" role="group" aria-label="Layout arrangement">
               <button class="toggle-btn active" data-layout="horizontal" id="layout-h">Horizontal</button>
               <button class="toggle-btn" data-layout="vertical" id="layout-v">Vertical</button>
               <button class="toggle-btn" data-layout="grid" id="layout-g">Grid</button>
@@ -272,8 +274,8 @@
           </div>
 
           <div class="control-group">
-            <label class="control-label">Letter Alignment</label>
-            <div class="align-toggle" role="group" aria-label="Letter alignment">
+            <label class="control-label">Baseline Align</label>
+            <div class="align-toggle" role="group" aria-label="Baseline alignment">
               <button class="toggle-btn" data-align="top">Top</button>
               <button class="toggle-btn" data-align="center">Center</button>
               <button class="toggle-btn active" data-align="bottom">Bottom</button>
@@ -281,7 +283,7 @@
           </div>
 
           <div class="control-group overlap-row">
-            <label class="control-label" for="allow-overlap">Allow Overlap</label>
+            <label class="control-label" for="allow-overlap">Overlap</label>
             <label class="switch">
               <input type="checkbox" id="allow-overlap">
               <span class="switch-track"></span>
@@ -296,7 +298,7 @@
           <div class="section-label">Font</div>
 
           <div class="control-group">
-            <label class="control-label" for="font-weight">Fill Weight</label>
+            <label class="control-label" for="font-weight">Weight</label>
             <select id="font-weight" class="select-input">
               <option value="100">100 — Thin</option>
               <option value="200">200 — ExtraLight</option>
@@ -311,15 +313,15 @@
           </div>
 
           <div class="control-group">
-            <label class="control-label" for="font-family">Font Family</label>
+            <label class="control-label" for="font-family">Typeface</label>
             <select id="font-family" class="select-input">
-              <option value="Space Mono">Space Mono (monospace)</option>
-              <option value="Syne">Syne (artistic)</option>
-              <option value="Inter">Inter (humanist)</option>
-              <option value="Arial">Arial (sans-serif)</option>
-              <option value="Georgia">Georgia (serif)</option>
-              <option value="Impact">Impact (display)</option>
-              <option value="monospace">Monospace (system)</option>
+              <option value="Space Mono">Space Mono — Monospace</option>
+              <option value="Syne">Syne — Display</option>
+              <option value="Inter">Inter — Sans-serif</option>
+              <option value="Arial">Arial — Sans-serif</option>
+              <option value="Georgia">Georgia — Serif</option>
+              <option value="Impact">Impact — Display</option>
+              <option value="monospace">Monospace — System</option>
             </select>
           </div>
         </div>

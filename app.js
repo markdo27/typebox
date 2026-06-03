@@ -57,7 +57,8 @@ const state = {
   // Per-letter
   selectedLetter:  null,   // index or null
   letterOverrides: {},     // { index → { rotation?, scale?, skew?, color?, fillChar? } }
-  offsets:         {},     // { index → px delta } — drag offsets
+  offsets:         {},     // { index → px delta } — horizontal drag offsets
+  yOffsets:        {},     // { index → px delta } — vertical drag offsets (arrow key nudge)
 };
 
 /** Export resolution multiplier */
@@ -94,7 +95,7 @@ function rasterizeCharacter(char, R, C_grid, fontFamily, fontWeight, widthRatio,
   tempCtx.fillRect(0, 0, W, H);
 
   const fontSize = H * 0.88;
-  tempCtx.font         = `bold ${fontSize}px "${fontFamily}", "Arial Black", Impact, sans-serif`;
+  tempCtx.font         = `${fontWeight} ${fontSize}px "${fontFamily}", "Arial Black", Impact, sans-serif`;
   tempCtx.textAlign    = 'center';
   tempCtx.textBaseline = 'middle';
   tempCtx.fillStyle    = '#ffffff';
@@ -315,8 +316,8 @@ function renderLetter(renderCtx, char, ox, oy, opts) {
       renderCtx.fillStyle = opts.hollowColor;
       renderCtx.fillRect(bx, by, bw, bh);
     } else if (blk.type === CH) {
-      // Fill density — skip randomly
-      if (Math.random() > opts.fillDensity) continue;
+      // Fill density — deterministic per block position so pattern is stable
+      if (hashInt(fillDensitySeed + opts.letterIndex * 97, blk.r, blk.c) > opts.fillDensity) continue;
       renderChar(renderCtx, opts.fillChar, bx, by, bw, bh, opts);
     }
   }
@@ -415,8 +416,9 @@ function computeLayout(letters) {
     let curY = 0;
     letters.forEach((char, i) => {
       const { w, h } = getLetterDims(char);
-      const dx = state.offsets[i] || 0;
-      positions.push({ x: (maxW - w) / 2 + dx, y: curY });
+      const dx = state.offsets[i]  || 0;
+      const dy = state.yOffsets[i] || 0;
+      positions.push({ x: (maxW - w) / 2 + dx, y: curY + dy });
       curY += h + gap;
     });
     canvasH = Math.max(1, curY - gap);
@@ -442,9 +444,10 @@ function computeLayout(letters) {
     for (let i = 0; i < n; i++) {
       const gc = i % colsCount;
       const gr = Math.floor(i / colsCount);
-      const dx = state.offsets[i] || 0;
+      const dx = state.offsets[i]  || 0;
+      const dy = state.yOffsets[i] || 0;
       const x  = colWidths.slice(0, gc).reduce((a, b) => a + b, 0) + gc * gap + dx;
-      const y  = rowHeights.slice(0, gr).reduce((a, b) => a + b, 0) + gr * gap;
+      const y  = rowHeights.slice(0, gr).reduce((a, b) => a + b, 0) + gr * gap + dy;
       positions.push({ x, y });
     }
   }
@@ -464,6 +467,15 @@ function computeLayout(letters) {
 
 let renderScheduled = false;
 let grainSeed       = 1;
+let fillDensitySeed = 1;   // changes only when user adjusts fillDensity slider
+
+/** Fast integer hash — deterministic per (seed, a, b) */
+function hashInt(seed, a, b) {
+  let h = (seed * 2654435761 ^ a * 2246822519 ^ b * 3266489917) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  h = Math.imul(h ^ (h >>> 16), 0x45d9f3b) >>> 0;
+  return (h ^ (h >>> 16)) / 4294967296;
+}
 
 function scheduleRender() {
   if (renderScheduled) return;
@@ -507,6 +519,7 @@ function doRender() {
       rotation:    ov.rotation ?? 0,
       scale:       ov.scale    ?? 1,
       skew:        ov.skew     ?? 0,
+      letterIndex: i,
     };
 
     renderLetter(ctx, char, x, y, opts);
@@ -677,6 +690,7 @@ function downloadPNG() {
       rotation:    ov.rotation ?? 0,
       scale:       ov.scale    ?? 1,
       skew:        ov.skew     ?? 0,
+      letterIndex: i,
     };
     renderLetter(ectx, char, x, y, opts);
   });
@@ -713,14 +727,15 @@ function hitTestLetter(canvasX, canvasY, letters) {
   const gap = state.letterSpacing;
 
   if (state.layout === 'horizontal') {
-    let currentX = 0;
+    const pad = state.canvasPadding;
+    let currentX = pad;
     for (let i = 0; i < letters.length; i++) {
       const { w } = getLetterDims(letters[i]);
       const dx = state.offsets[i] || 0;
       const lx = currentX + dx;
-      const pad = state.canvasPadding;
-      if (canvasX >= lx + pad && canvasX < lx + pad + w) return i;
-      currentX += w + gap;
+      if (canvasX >= lx && canvasX < lx + w) return i;
+      const advance = state.allowOverlap ? Math.min(w, w + gap) : w + gap;
+      currentX += advance;
     }
   } else {
     const { positions } = computeLayout(letters);
@@ -832,11 +847,13 @@ canvas.addEventListener('touchstart', e => {
   if (e.touches.length !== 1) return;
   const t    = e.touches[0];
   const rect = canvas.getBoundingClientRect();
-  const scaleX = canvas.width / PREVIEW_SCALE / rect.width;
+  const scaleX = canvas.width  / PREVIEW_SCALE / rect.width;
+  const scaleY = canvas.height / PREVIEW_SCALE / rect.height;
   const cx   = (t.clientX - rect.left) * scaleX;
+  const cy   = (t.clientY - rect.top)  * scaleY;
   const rawText = state.bigText.trim().toUpperCase() || 'O';
   const letters = rawText.split('');
-  const idx = hitTestLetter(cx, 0, letters);
+  const idx = hitTestLetter(cx, cy, letters);
   if (idx < 0) return;
   drag = { idx, startX: t.clientX, startOffset: state.offsets[idx] || 0 };
   e.preventDefault();
@@ -1013,6 +1030,7 @@ function wireInputs() {
   // ── Fill density ──
   wireSlider('fill-density', 'fill-density-val', v => {
     state.fillDensity = parseFloat(v);
+    fillDensitySeed   = (fillDensitySeed * 1664525 + 1013904223) & 0x7fffffff || 1;
   }, '', 2);
 
   // ── Canvas padding ──
@@ -1200,7 +1218,7 @@ function wireInputs() {
       grainAmount: 0, fontWeight: '400', fontFamily: 'Space Mono',
       layout: 'horizontal', letterAlign: 'bottom', allowOverlap: false,
       animMode: 'none', animSpeed: 1.0,
-      selectedLetter: null, letterOverrides: {}, offsets: {},
+      selectedLetter: null, letterOverrides: {}, offsets: {}, yOffsets: {},
     });
 
     stopAnimation();
@@ -1296,10 +1314,35 @@ function wirePlSlider(inputId, valId, ovKey, unit = '', decimals = 0) {
 
 document.addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key === 's') { e.preventDefault(); downloadPNG(); }
-  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { state.offsets = {}; scheduleRender(); }
+  if ((e.ctrlKey || e.metaKey) && e.key === 'z') { state.offsets = {}; state.yOffsets = {}; scheduleRender(); }
   if (e.key === 'Escape') {
     state.selectedLetter = null;
     hidePerLetterPanel();
+    scheduleRender();
+  }
+
+  // Arrow key nudge for selected letter (1px; 10px with Shift)
+  const ARROWS = ['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'];
+  if (ARROWS.includes(e.key) && state.selectedLetter !== null) {
+    // Only nudge if the focus is NOT inside a text/number input (let those handle arrows naturally)
+    const tag = document.activeElement?.tagName;
+    if (tag === 'INPUT' && document.activeElement.type !== 'range') return;
+
+    e.preventDefault();
+    const step = e.shiftKey ? 10 : 1;
+    const idx  = state.selectedLetter;
+    const cur  = state.offsets[idx] || 0;
+
+    if (e.key === 'ArrowLeft')  state.offsets[idx] = cur - step;
+    if (e.key === 'ArrowRight') state.offsets[idx] = cur + step;
+    // Up/Down only make sense in vertical/grid layouts; in horizontal they do nothing visible
+    // but we still store them for consistency (layout positions use y from computeLayout)
+    if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && state.layout !== 'horizontal') {
+      // For vertical/grid: adjust the y via a dedicated yOffsets map
+      if (!state.yOffsets) state.yOffsets = {};
+      const curY = state.yOffsets[idx] || 0;
+      state.yOffsets[idx] = curY + (e.key === 'ArrowDown' ? step : -step);
+    }
     scheduleRender();
   }
 });

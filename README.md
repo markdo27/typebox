@@ -116,6 +116,8 @@ typebox/
 | `Ctrl + S` | Download PNG |
 | `Ctrl + Z` | Reset all letter positions |
 | `Escape` | Deselect current letter |
+| `← → ↑ ↓` | Nudge selected letter 1px |
+| `Shift + arrows` | Nudge selected letter 10px |
 
 ---
 
