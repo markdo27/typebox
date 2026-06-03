@@ -1,0 +1,2271 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DitherPat — Anti-Gravity Halftone Engine</title>
+  <meta name="description" content="Real-time SVG halftone, low-poly generative, and guided structure pattern engine with Anti-Gravity physics.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --ink:      #0a0a0a;
+      --ink-2:    #111111;
+      --ink-3:    #1c1c1c;
+      --ink-4:    #252525;
+      --paper:    #f4f4f0;
+      --paper-2:  #c8c8c4;
+      --paper-3:  #8a8a88;
+      --paper-4:  #3a3a38;
+      --red:      #e8000b;
+      --red-ghost:rgba(232,0,11,0.08);
+      --font:     'Inter', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      --mono:     'Space Mono', monospace;
+      --panel-w:  288px;
+      --topbar-h: 44px;
+      --r1: 2px;
+      --g1: 4px; --g2: 8px; --g3: 12px; --g4: 16px; --g5: 20px; --g6: 24px;
+      --dur: 200ms;
+      --ease: cubic-bezier(0.4,0,0.2,1);
+      --t-2xs: 10px; --t-xs: 11px; --t-sm: 12px; --t-base: 13px;
+    }
+
+    html, body { height: 100%; background: var(--ink); color: var(--paper); font-family: var(--font); font-size: var(--t-base); overflow: hidden; }
+
+    /* ── Topbar ────────────────────────────────── */
+    .topbar {
+      height: var(--topbar-h);
+      background: var(--ink-2);
+      border-bottom: 1px solid var(--paper-4);
+      display: flex; align-items: center;
+      padding: 0 var(--g4); gap: var(--g6);
+      position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    }
+    .brand { display: flex; align-items: center; gap: var(--g2); }
+    .brand-sq { width: 10px; height: 10px; background: var(--red); flex-shrink: 0; }
+    .brand-name { font-size: 13px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; }
+    .brand-sub  { font-size: var(--t-xs); font-weight: 500; color: var(--paper-3); letter-spacing: 0.08em; text-transform: uppercase; }
+    .topbar-sep { width: 1px; height: 20px; background: var(--paper-4); }
+    .topbar-back {
+      font-size: var(--t-xs); font-weight: 600; color: var(--paper-3);
+      text-decoration: none; letter-spacing: 0.10em; text-transform: uppercase;
+      transition: color var(--dur) var(--ease);
+    }
+    .topbar-back:hover { color: var(--paper); }
+    .topbar-hint { margin-left: auto; font-size: var(--t-xs); color: var(--paper-4); letter-spacing: 0.04em; }
+
+    /* ── Layout ────────────────────────────────── */
+    .dp-layout { display: flex; height: calc(100vh - var(--topbar-h)); margin-top: var(--topbar-h); }
+
+    /* ── Panel ─────────────────────────────────── */
+    .dp-panel {
+      width: var(--panel-w); flex-shrink: 0;
+      background: var(--ink-2); border-right: 1px solid var(--paper-4);
+      display: flex; flex-direction: column; overflow: hidden;
+    }
+    .dp-panel-scroll {
+      flex: 1; overflow-y: auto; overflow-x: hidden;
+      padding: var(--g4); display: flex; flex-direction: column; gap: var(--g5);
+    }
+    .dp-panel-scroll::-webkit-scrollbar { width: 4px; }
+    .dp-panel-scroll::-webkit-scrollbar-track { background: transparent; }
+    .dp-panel-scroll::-webkit-scrollbar-thumb { background: var(--paper-4); border-radius: 2px; }
+    .panel-footer { padding: var(--g3) var(--g4); border-top: 1px solid var(--paper-4); background: var(--ink-2); }
+
+    .section-block { display: flex; flex-direction: column; gap: var(--g3); }
+    .section-label {
+      font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--paper-3);
+      border-bottom: 1px solid var(--red); padding-bottom: 5px;
+    }
+    .panel-divider { height: 1px; background: var(--paper-4); }
+    .control-group { display: flex; flex-direction: column; gap: 5px; }
+    .control-label {
+      font-size: var(--t-xs); font-weight: 600; color: var(--paper-2);
+      letter-spacing: 0.04em; display: flex; align-items: center; gap: var(--g2);
+    }
+    .value-badge {
+      margin-left: auto; font-family: var(--mono); font-size: 10px;
+      background: var(--ink-4); color: var(--paper-3); padding: 1px 5px;
+      border-radius: var(--r1); letter-spacing: 0;
+    }
+    .hint { font-size: 10px; color: var(--paper-4); line-height: 1.4; }
+
+    /* Slider */
+    .slider {
+      -webkit-appearance: none; appearance: none; width: 100%;
+      height: 3px; background: var(--ink-4); border-radius: 0; outline: none; cursor: pointer;
+    }
+    .slider::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 13px; height: 13px;
+      background: var(--paper); border-radius: 0; cursor: pointer;
+      transition: background var(--dur) var(--ease);
+    }
+    .slider::-webkit-slider-thumb:hover { background: var(--red); }
+    .slider::-moz-range-thumb { width: 13px; height: 13px; background: var(--paper); border: none; border-radius: 0; cursor: pointer; }
+
+    /* Toggle group */
+    .toggle-group { display: flex; gap: 2px; }
+    .toggle-btn {
+      flex: 1; height: 30px;
+      background: var(--ink-4); border: 1px solid var(--paper-4); border-radius: var(--r1);
+      color: var(--paper-3); font-family: var(--font); font-size: var(--t-xs);
+      font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+      cursor: pointer; transition: all var(--dur) var(--ease);
+    }
+    .toggle-btn:hover { background: var(--ink-3); color: var(--paper-2); }
+    .toggle-btn.active { background: var(--paper); border-color: var(--paper); color: var(--ink); }
+
+    /* Color swatch */
+    .color-row { display: flex; gap: var(--g2); }
+    .color-group { flex: 1; display: flex; flex-direction: column; gap: 4px; }
+    .color-swatch-wrap {
+      display: flex; align-items: center; gap: var(--g2);
+      background: var(--ink-4); border: 1px solid var(--paper-4);
+      border-radius: var(--r1); padding: 5px 8px; cursor: pointer;
+      transition: border-color var(--dur) var(--ease);
+    }
+    .color-swatch-wrap:hover { border-color: var(--paper-3); }
+    .color-input {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border: none; padding: 0; cursor: pointer; border-radius: var(--r1); background: transparent;
+    }
+    .color-input::-webkit-color-swatch-wrapper { padding: 0; }
+    .color-input::-webkit-color-swatch { border: none; border-radius: var(--r1); }
+    .color-hex { font-family: var(--mono); font-size: 10px; color: var(--paper-3); letter-spacing: 0; }
+
+    /* Switch */
+    .switch { display: inline-flex; cursor: pointer; }
+    .switch-track {
+      width: 32px; height: 18px; background: var(--ink-4);
+      border: 1px solid var(--paper-4); border-radius: 9px;
+      position: relative; transition: all var(--dur) var(--ease);
+    }
+    .switch-track::after {
+      content: ''; position: absolute; top: 2px; left: 2px;
+      width: 12px; height: 12px; background: var(--paper-3);
+      border-radius: 50%; transition: all var(--dur) var(--ease);
+    }
+    input[type="checkbox"]:checked + .switch-track { background: var(--red); border-color: var(--red); }
+    input[type="checkbox"]:checked + .switch-track::after { transform: translateX(14px); background: #fff; }
+    input[type="checkbox"] { display: none; }
+    .switch-row { display: flex; align-items: center; justify-content: space-between; }
+
+    /* Source / render mode buttons */
+    .source-row { display: flex; gap: 3px; flex-wrap: wrap; }
+    .source-btn {
+      flex: 1; min-width: 44px; height: 32px;
+      background: var(--ink-4); border: 1px solid var(--paper-4); border-radius: var(--r1);
+      color: var(--paper-3); font-family: var(--font); font-size: var(--t-xs);
+      font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+      cursor: pointer; transition: all var(--dur) var(--ease);
+      display: flex; align-items: center; justify-content: center; gap: 4px; white-space: nowrap;
+    }
+    .source-btn:hover { border-color: var(--paper-3); color: var(--paper-2); }
+    .source-btn.active { background: var(--red); border-color: var(--red); color: #fff; }
+
+    /* SVG preview */
+    .svg-preview {
+      width: 100%; height: 56px;
+      background: var(--ink-4); border: 1px solid var(--paper-4); border-radius: var(--r1);
+      display: flex; align-items: center; justify-content: center;
+      overflow: hidden; position: relative;
+    }
+    .svg-preview img { max-width: 80%; max-height: 80%; object-fit: contain; }
+    .svg-preview-hint {
+      font-size: var(--t-2xs); color: var(--paper-4); letter-spacing: 0.06em; text-transform: uppercase;
+    }
+    .svg-preview-label {
+      position: absolute; top: 4px; right: 6px;
+      font-size: var(--t-2xs); color: var(--red); font-weight: 700; letter-spacing: 0.08em;
+    }
+
+    /* Render mode toggle (3 big pills) */
+    .rmode-group { display: flex; flex-direction: column; gap: 3px; }
+    .rmode-btn {
+      width: 100%; height: 36px;
+      background: var(--ink-4); border: 1px solid var(--paper-4); border-radius: var(--r1);
+      color: var(--paper-3); font-family: var(--font); font-size: var(--t-xs);
+      font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase;
+      cursor: pointer; transition: all var(--dur) var(--ease);
+      display: flex; align-items: center; padding: 0 var(--g3); gap: var(--g3);
+    }
+    .rmode-btn:hover { border-color: var(--paper-3); color: var(--paper-2); background: var(--ink-3); }
+    .rmode-btn.active { background: var(--paper); border-color: var(--paper); color: var(--ink); }
+    .rmode-icon { font-size: 14px; width: 18px; text-align: center; flex-shrink: 0; }
+    .rmode-desc { font-size: 9px; font-weight: 500; letter-spacing: 0.04em; opacity: 0.7; margin-left: auto; }
+
+    /* Sub-controls expand */
+    .sub-controls {
+      overflow: hidden; max-height: 0; opacity: 0;
+      transition: max-height 400ms var(--ease), opacity 300ms var(--ease);
+      display: flex; flex-direction: column; gap: var(--g3);
+    }
+    .sub-controls.visible { max-height: 500px; opacity: 1; }
+
+    /* ── Anti-Gravity Button ────────────────────── */
+    .ag-toggle {
+      width: 100%; height: 52px;
+      background: var(--ink-4); border: 2px solid var(--paper-4); border-radius: var(--r1);
+      color: var(--paper-3); font-family: var(--font); font-size: 13px;
+      font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: var(--g3);
+      transition: all 300ms var(--ease); position: relative; overflow: hidden;
+    }
+    .ag-toggle::before {
+      content: ''; position: absolute; inset: 0;
+      background: var(--red); opacity: 0; transition: opacity 300ms var(--ease);
+    }
+    .ag-toggle:hover { border-color: var(--red); color: var(--paper); }
+    .ag-toggle:hover::before { opacity: 0.08; }
+    .ag-toggle.active { border-color: var(--red); color: #fff; animation: ag-pulse 2s ease-in-out infinite; }
+    .ag-toggle.active::before { opacity: 1; }
+    .ag-toggle .ag-icon { font-size: 18px; position: relative; }
+    .ag-toggle.active .ag-icon { animation: float-icon 1.5s ease-in-out infinite; }
+    .ag-toggle span:not(.ag-icon) { position: relative; }
+
+    @keyframes ag-pulse { 0%,100% { box-shadow: 0 0 0 0 rgba(232,0,11,0.4); } 50% { box-shadow: 0 0 0 8px rgba(232,0,11,0); } }
+    @keyframes float-icon { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+    /* ── Canvas area ───────────────────────────── */
+    .dp-canvas-area { flex: 1; position: relative; overflow: hidden; background: #000; }
+    #dp-canvas { display: block; width: 100%; height: 100%; cursor: crosshair; }
+
+    .dp-stats {
+      position: absolute; bottom: var(--g3); left: var(--g4);
+      font-family: var(--mono); font-size: 10px; color: rgba(244,244,240,0.25);
+      letter-spacing: 0.04em; pointer-events: none; line-height: 1.7;
+    }
+
+    /* Mode badge */
+    .dp-mode-badge {
+      position: absolute; top: var(--g3); left: var(--g4);
+      font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.14em;
+      text-transform: uppercase; color: var(--red); pointer-events: none;
+      opacity: 0; transition: opacity 300ms var(--ease);
+    }
+    .dp-mode-badge.visible { opacity: 1; animation: blink-badge 1.5s step-end infinite; }
+    @keyframes blink-badge { 0%,100% { opacity: 1; } 50% { opacity: 0.2; } }
+
+    /* LP regenerate button */
+    .btn-sm {
+      height: 30px; width: 100%;
+      background: transparent; border: 1px dashed var(--paper-4); border-radius: var(--r1);
+      color: var(--paper-3); font-family: var(--font); font-size: var(--t-xs);
+      font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      cursor: pointer; transition: all var(--dur) var(--ease);
+    }
+    .btn-sm:hover { border-color: var(--paper-2); color: var(--paper); border-style: solid; background: var(--ink-3); }
+
+    /* Export btn */
+    .btn-export {
+      width: 100%; height: 36px;
+      background: transparent; border: 1px solid var(--paper-4); border-radius: var(--r1);
+      color: var(--paper-3); font-family: var(--font); font-size: var(--t-xs);
+      font-weight: 700; letter-spacing: 0.10em; text-transform: uppercase;
+      cursor: pointer; transition: all var(--dur) var(--ease);
+    }
+    .btn-export:hover { border-color: var(--paper-2); color: var(--paper); background: var(--ink-3); }
+
+    .dp-toast {
+      position: fixed; bottom: var(--g5); left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--paper); color: var(--ink);
+      font-size: var(--t-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+      padding: var(--g2) var(--g5); border-radius: var(--r1);
+      opacity: 0; pointer-events: none; transition: all 260ms var(--ease); z-index: 999;
+    }
+    .dp-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    #img-file-input, #svg-file-input, #sf-pattern-input, #sf-body-input { display: none; }
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after { animation: none !important; transition-duration: 0.01ms !important; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── Topbar ──────────────────────────────────────── -->
+<nav class="topbar" role="banner">
+  <div class="brand">
+    <span class="brand-sq" aria-hidden="true"></span>
+    <span class="brand-name">DitherPat</span>
+    <span class="brand-sub">Halftone · Low Poly · Guided</span>
+  </div>
+  <span class="topbar-sep" aria-hidden="true"></span>
+  <a href="./index.html" class="topbar-back">← RASTER.PRESS</a>
+  <span class="topbar-hint" aria-hidden="true">Upload SVG shape → select render mode → engage Anti-Gravity</span>
+</nav>
+
+<!-- ── Layout ──────────────────────────────────────── -->
+<div class="dp-layout">
+
+  <!-- Control Panel -->
+  <aside class="dp-panel" role="complementary">
+    <div class="dp-panel-scroll">
+
+      <!-- ── Source ── -->
+      <div class="section-block">
+        <div class="section-label">Source</div>
+        <div class="source-row">
+          <button class="source-btn active" id="src-test">◈ Test</button>
+          <button class="source-btn" id="src-webcam">◉ Cam</button>
+          <button class="source-btn" id="src-image">▦ Image</button>
+        </div>
+        <input type="file" id="img-file-input" accept="image/*">
+        <p class="hint" id="source-hint">Animated procedural pattern</p>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- ── SVG Shape ── -->
+      <div class="section-block">
+        <div class="section-label">SVG Shape</div>
+
+        <div class="svg-preview" id="svg-preview">
+          <span class="svg-preview-hint">No shape loaded</span>
+        </div>
+
+        <div class="source-row">
+          <button class="source-btn" id="svg-upload-btn">↑ Upload SVG</button>
+          <button class="source-btn" id="svg-clear-btn">✕ Clear</button>
+        </div>
+        <input type="file" id="svg-file-input" accept=".svg,image/svg+xml">
+        <input type="file" id="sf-pattern-input" accept=".svg,image/svg+xml">
+        <input type="file" id="sf-body-input" accept=".svg,image/svg+xml">
+
+        <div class="switch-row">
+          <span class="control-label">Tint SVG with dot color</span>
+          <label class="switch">
+            <input type="checkbox" id="svg-tint">
+            <span class="switch-track"></span>
+          </label>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="svg-rotation">
+            Rotation
+            <span class="value-badge" id="svg-rotation-val">0°</span>
+          </label>
+          <input type="range" id="svg-rotation" class="slider" min="0" max="360" value="0" step="1">
+        </div>
+
+        <p class="hint">Upload any SVG — it becomes the pixel unit for all render modes</p>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- ── Render Mode ── -->
+      <div class="section-block">
+        <div class="section-label">Render Mode</div>
+
+        <div class="rmode-group">
+          <button class="rmode-btn active" data-rmode="halftone" id="rmode-halftone">
+            <span class="rmode-icon">◎</span>
+            Halftone
+            <span class="rmode-desc">Physics · 7 states</span>
+          </button>
+          <button class="rmode-btn" data-rmode="lowpoly" id="rmode-lowpoly">
+            <span class="rmode-icon">△</span>
+            Low Poly
+            <span class="rmode-desc">Jitter · Triangulate</span>
+          </button>
+          <button class="rmode-btn" data-rmode="guided" id="rmode-guided">
+            <span class="rmode-icon">▩</span>
+            Guided Structure
+            <span class="rmode-desc">Tiled · Luminance</span>
+          </button>
+          <button class="rmode-btn" data-rmode="shapefill" id="rmode-shapefill">
+            <span class="rmode-icon">◫</span>
+            Shape Fill
+            <span class="rmode-desc">SVG mask · tile inside</span>
+          </button>
+        </div>
+
+        <!-- Halftone sub-controls -->
+        <div class="sub-controls visible" id="sub-halftone">
+          <div class="control-group">
+            <label class="control-label" for="grid-cols">
+              Grid Columns
+              <span class="value-badge" id="grid-cols-val">50</span>
+            </label>
+            <input type="range" id="grid-cols" class="slider" min="10" max="100" value="50" step="1">
+            <p class="hint" id="grid-info">50 × 28 = 1,400 particles</p>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="dot-scale">
+              Dot Scale
+              <span class="value-badge" id="dot-scale-val">0.90</span>
+            </label>
+            <input type="range" id="dot-scale" class="slider" min="0.2" max="1.0" value="0.9" step="0.01">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label">Shape Style</label>
+            <div class="toggle-group" id="shape-style-group">
+              <button class="toggle-btn active" data-shape="circle">●</button>
+              <button class="toggle-btn" data-shape="square">■</button>
+              <button class="toggle-btn" data-shape="diamond">◆</button>
+              <button class="toggle-btn" data-shape="cross">✛</button>
+              <button class="toggle-btn" data-shape="ring">◎</button>
+            </div>
+          </div>
+
+          <div class="switch-row">
+            <span class="control-label">Invert luminance</span>
+            <label class="switch">
+              <input type="checkbox" id="invert-lum">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Low Poly sub-controls -->
+        <div class="sub-controls" id="sub-lowpoly">
+          <div class="control-group">
+            <label class="control-label" for="lp-cols">
+              Density
+              <span class="value-badge" id="lp-cols-val">20</span>
+            </label>
+            <input type="range" id="lp-cols" class="slider" min="5" max="60" value="20" step="1">
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="lp-jitter">
+              Jitter
+              <span class="value-badge" id="lp-jitter-val">0.70</span>
+            </label>
+            <input type="range" id="lp-jitter" class="slider" min="0.0" max="1.0" value="0.7" step="0.05">
+            <p class="hint">0 = rigid grid · 1 = organic randomness</p>
+          </div>
+          <div class="switch-row">
+            <span class="control-label">Use image colors</span>
+            <label class="switch">
+              <input type="checkbox" id="lp-image-color" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+          <div class="switch-row">
+            <span class="control-label">Show edges</span>
+            <label class="switch">
+              <input type="checkbox" id="lp-edges">
+              <span class="switch-track"></span>
+            </label>
+          </div>
+          <button class="btn-sm" id="lp-regen">↺ Regenerate Mesh</button>
+        </div>
+
+        <!-- Guided Structure sub-controls -->
+        <div class="sub-controls" id="sub-guided">
+          <div class="control-group">
+            <label class="control-label" for="guided-cols">
+              Grid Density
+              <span class="value-badge" id="guided-cols-val">30</span>
+            </label>
+            <input type="range" id="guided-cols" class="slider" min="5" max="80" value="30" step="1">
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="guided-threshold">
+              Threshold
+              <span class="value-badge" id="guided-threshold-val">50%</span>
+            </label>
+            <input type="range" id="guided-threshold" class="slider" min="0" max="100" value="50" step="1">
+            <p class="hint">Luminance above this → show shape</p>
+          </div>
+          <div class="control-group">
+            <label class="control-label">Tiling Mode</label>
+            <div class="toggle-group">
+              <button class="toggle-btn active" data-tiling="alt">Alt</button>
+              <button class="toggle-btn" data-tiling="quad">Quad</button>
+              <button class="toggle-btn" data-tiling="mirror">Mirror</button>
+            </div>
+          </div>
+          <div class="switch-row">
+            <span class="control-label">Scale by luminance</span>
+            <label class="switch">
+              <input type="checkbox" id="guided-scale-lum" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Shape Fill sub-controls -->
+        <div class="sub-controls" id="sub-shapefill">
+
+          <div class="section-label" style="font-size:10px;border-bottom-color:var(--paper-4);">① Pattern Shape</div>
+          <div class="svg-preview" id="sf-pattern-preview">
+            <span class="svg-preview-hint">No pattern loaded</span>
+          </div>
+          <div class="source-row">
+            <button class="source-btn" id="sf-pattern-btn">↑ Upload Pattern</button>
+            <button class="source-btn" id="sf-pattern-clear">✕</button>
+          </div>
+
+          <div class="section-label" style="font-size:10px;border-bottom-color:var(--paper-4);margin-top:6px;">② Body Shape (mask)</div>
+          <div class="svg-preview" id="sf-body-preview">
+            <span class="svg-preview-hint">No body loaded</span>
+          </div>
+          <div class="source-row">
+            <button class="source-btn" id="sf-body-btn">↑ Upload Body</button>
+            <button class="source-btn" id="sf-body-clear">✕</button>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="sf-grid-cols">
+              Grid Density
+              <span class="value-badge" id="sf-grid-cols-val">40</span>
+            </label>
+            <input type="range" id="sf-grid-cols" class="slider" min="5" max="120" value="40" step="1">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="sf-pattern-scale">
+              Pattern Scale
+              <span class="value-badge" id="sf-pattern-scale-val">0.85</span>
+            </label>
+            <input type="range" id="sf-pattern-scale" class="slider" min="0.1" max="1.5" value="0.85" step="0.01">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="sf-pattern-rotation">
+              Pattern Rotation
+              <span class="value-badge" id="sf-pattern-rotation-val">0°</span>
+            </label>
+            <input type="range" id="sf-pattern-rotation" class="slider" min="0" max="360" value="0" step="1">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="sf-threshold">
+              Mask Threshold
+              <span class="value-badge" id="sf-threshold-val">30</span>
+            </label>
+            <input type="range" id="sf-threshold" class="slider" min="0" max="200" value="30" step="5">
+            <p class="hint">Alpha level to detect inside body shape</p>
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="sf-body-color">Body BG Color</label>
+            <div class="color-swatch-wrap" id="sf-body-color-wrap">
+              <input type="color" id="sf-body-color" class="color-input" value="#1a1aee">
+              <span class="color-hex" id="sf-body-color-hex">#1a1aee</span>
+            </div>
+          </div>
+
+          <div class="switch-row">
+            <span class="control-label">Show body behind pattern</span>
+            <label class="switch">
+              <input type="checkbox" id="sf-show-body" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          <div class="control-group" id="sf-body-opacity-group">
+            <label class="control-label" for="sf-body-opacity">
+              Body opacity
+              <span class="value-badge" id="sf-body-opacity-val">0.40</span>
+            </label>
+            <input type="range" id="sf-body-opacity" class="slider" min="0" max="1" value="0.4" step="0.01">
+          </div>
+
+          <div class="switch-row">
+            <span class="control-label">Tint body with body color</span>
+            <label class="switch">
+              <input type="checkbox" id="sf-tint-body" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          <div class="switch-row">
+            <span class="control-label">Tint pattern with dot color</span>
+            <label class="switch">
+              <input type="checkbox" id="sf-tint-pattern" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
+
+          <p class="hint">Pattern color = Shape color in Color panel<br>Body BG picks are above</p>
+        </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- ── Color ── -->
+      <div class="section-block">
+        <div class="section-label">Color</div>
+        <div class="color-row">
+          <div class="color-group">
+            <label class="control-label" for="dot-color">Shape</label>
+            <div class="color-swatch-wrap" id="dot-color-wrap">
+              <input type="color" id="dot-color" class="color-input" value="#ffffff">
+              <span class="color-hex" id="dot-color-hex">#ffffff</span>
+            </div>
+          </div>
+          <div class="color-group">
+            <label class="control-label" for="bg-color">BG</label>
+            <div class="color-swatch-wrap" id="bg-color-wrap">
+              <input type="color" id="bg-color" class="color-input" value="#0a0a0a">
+              <span class="color-hex" id="bg-color-hex">#0a0a0a</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-group">
+          <label class="control-label" for="dot-opacity">
+            Opacity
+            <span class="value-badge" id="dot-opacity-val">1.00</span>
+          </label>
+          <input type="range" id="dot-opacity" class="slider" min="0.1" max="1" value="1" step="0.01">
+        </div>
+
+        <div class="switch-row">
+          <span class="control-label" style="display:flex;flex-direction:column;gap:2px;">
+            Monotone
+            <span style="font-size:10px;font-weight:400;color:var(--paper-4);">Flat color, binary threshold</span>
+          </span>
+          <label class="switch">
+            <input type="checkbox" id="monotone-toggle">
+            <span class="switch-track"></span>
+          </label>
+        </div>
+
+        <div class="control-group" id="monotone-thr-group" style="display:none;">
+          <label class="control-label" for="monotone-thr">
+            Cut threshold
+            <span class="value-badge" id="monotone-thr-val">50%</span>
+          </label>
+          <input type="range" id="monotone-thr" class="slider" min="0" max="100" value="50" step="1">
+          <p class="hint">Luminance ≥ threshold → full color · below → hidden</p>
+        </div>
+      </div>
+
+      <div class="panel-divider"></div>
+
+      <!-- ── Physics (Halftone only) ── -->
+      <div class="section-block" id="physics-section">
+        <div class="section-label">Physics</div>
+
+        <button class="ag-toggle" id="ag-toggle" aria-pressed="false">
+          <span class="ag-icon" aria-hidden="true">⬆</span>
+          <span>Anti-Gravity</span>
+        </button>
+
+        <div class="sub-controls" id="ag-controls">
+          <div class="control-group">
+            <label class="control-label" for="buoyancy">
+              Buoyancy
+              <span class="value-badge" id="buoyancy-val">0.15</span>
+            </label>
+            <input type="range" id="buoyancy" class="slider" min="0.01" max="1.0" value="0.15" step="0.01">
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="drag-force">
+              Air Drag
+              <span class="value-badge" id="drag-val">0.92</span>
+            </label>
+            <input type="range" id="drag-force" class="slider" min="0.70" max="0.99" value="0.92" step="0.01">
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="repulsion-str">
+              Mouse Repulsion
+              <span class="value-badge" id="repulsion-val">80</span>
+            </label>
+            <input type="range" id="repulsion-str" class="slider" min="0" max="300" value="80" step="5">
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="repulsion-r">
+              Repulsion Radius
+              <span class="value-badge" id="repulsion-r-val">120px</span>
+            </label>
+            <input type="range" id="repulsion-r" class="slider" min="20" max="400" value="120" step="10">
+          </div>
+          <div class="control-group">
+            <label class="control-label" for="turbulence">
+              Turbulence
+              <span class="value-badge" id="turbulence-val">0.00</span>
+            </label>
+            <input type="range" id="turbulence" class="slider" min="0" max="2.0" value="0" step="0.05">
+          </div>
+        </div>
+
+        <div class="control-group">
+          <label class="control-label" for="snap-str">
+            Snap Speed
+            <span class="value-badge" id="snap-val">0.08</span>
+          </label>
+          <input type="range" id="snap-str" class="slider" min="0.01" max="0.40" value="0.08" step="0.01">
+        </div>
+      </div>
+
+    </div><!-- /scroll -->
+
+    <div class="panel-footer">
+      <div style="display:flex;gap:4px;">
+        <button class="btn-export" id="export-png-btn" style="flex:1;">↓ PNG</button>
+        <button class="btn-export" id="export-svg-btn" style="flex:1;border-color:var(--red);color:var(--red);" onmouseover="this.style.background='var(--red)';this.style.color='#fff'" onmouseout="this.style.background='';this.style.color='var(--red)'">↓ SVG</button>
+      </div>
+      <p style="font-size:10px;color:var(--paper-4);margin-top:6px;line-height:1.4;">SVG = true vectors · all 3 modes · embeds custom shape</p>
+    </div>
+  </aside>
+
+  <!-- Canvas area -->
+  <main class="dp-canvas-area" id="dp-canvas-area">
+    <canvas id="dp-canvas"></canvas>
+    <div class="dp-mode-badge" id="dp-mode-badge">⬆ Anti-Gravity Active</div>
+    <div class="dp-stats" id="dp-stats">FPS: — · Mode: Halftone · Particles: —</div>
+  </main>
+
+</div>
+
+<div class="dp-toast" id="dp-toast" role="alert"></div>
+
+<script>
+'use strict';
+
+/* ════════════════════════════════════════════════════════════════════
+   DitherPatEngine — v2
+   Render modes: Halftone (physics) · Low Poly (triangulation) · Guided Structure (tiled SVG)
+   SVG shape support: upload any SVG as the pixel/shape unit
+   ════════════════════════════════════════════════════════════════════ */
+
+class DitherPatEngine {
+
+  constructor(canvasEl) {
+    this.canvas = canvasEl;
+    this.ctx    = canvasEl.getContext('2d', { alpha: false });
+
+    /* ── Core settings ────────────────────────── */
+    this.gridCols    = 50;
+    this.gridRows    = 0;
+    this.cellW       = 0;
+    this.cellH       = 0;
+    this.dotScale    = 0.90;
+    this.dotColor    = '#ffffff';
+    this.bgColor     = '#0a0a0a';
+    this.dotOpacity  = 1.0;
+    this.shapeStyle  = 'circle';
+    this.invertLum   = false;
+    this.monotone    = false;   // flat color — binary on/off, no opacity/size graduation
+    this.monotoneThr = 0.50;   // luminance threshold for monotone mode (0..1)
+    this.svgRotation  = 0;     // degrees (0-360) applied to uploaded SVG shape
+
+    /* ── SVG shape ────────────────────────────── */
+    this.svgImage    = null;   // HTMLImageElement
+    this.svgDataURL  = null;
+    this.tintSVG     = false;
+
+    /* ── Render mode ──────────────────────────── */
+    this.renderMode  = 'halftone'; // 'halftone' | 'lowpoly' | 'guided'
+
+    /* ── Physics (halftone mode) ──────────────── */
+    this.antiGravity  = false;
+    this.buoyancy     = 0.15;
+    this.drag         = 0.92;
+    this.repulsionStr = 80;
+    this.repulsionR   = 120;
+    this.snapStrength = 0.08;
+    this.turbulence   = 0.0;
+
+    /* ── Low poly settings ────────────────────── */
+    this.lpCols          = 20;
+    this.lpJitter        = 0.70;
+    this.lpUseImageColor = true;
+    this.lpShowEdges     = false;
+    this.lpTriangles     = [];   // [{a,b,c} — each is {x,y}]
+    this._lpDirty        = true; // needs recompute
+
+    /* ── Guided structure settings ────────────── */
+    this.guidedCols      = 30;
+    this.guidedThreshold = 0.50; // luminance 0..1
+    this.guidedTiling    = 'alt'; // 'alt' | 'quad' | 'mirror'
+    this.guidedScaleLum  = true;
+
+    /* ── Shape Fill mode ──────────────────────── */
+    this.sfPatternSVG     = null;   // small repeating shape
+    this.sfPatternDataURL = null;
+    this.sfBodySVG        = null;   // stencil/mask shape
+    this.sfBodyDataURL    = null;
+    this.sfBodyOffscreen  = null;   // rasterized body for mask detection
+    this.sfBodyOffCtx     = null;
+    this.sfBodyData       = null;   // Uint8ClampedArray pixel data
+    this.sfBodyRes        = 512;    // offscreen resolution for mask
+    this.sfGridCols       = 40;
+    this.sfPatternScale   = 0.85;
+    this.sfBodyColor      = '#1a1aee';
+    this.sfBodyOpacity    = 0.40;
+    this.sfShowBody       = true;
+    this.sfTintBody       = true;
+    this.sfTintPattern    = true;
+    this.sfThreshold      = 30;    // alpha threshold (0-255) to detect inside body
+    this.sfPatternRotation = 0;    // degrees (0-360) rotation for each pattern tile
+
+    /* ── Source ───────────────────────────────── */
+    this.sourceMode  = 'test';
+    this.videoEl     = this._makeVideo();
+    this.imageEl     = null;
+    this._testT      = 0;
+
+    /* ── State ────────────────────────────────── */
+    this.particles   = [];
+    this.svgCache    = new Map();
+    this.mouse       = { x: -9999, y: -9999 };
+    this.rafId       = null;
+    this._fps        = 0;
+    this._fpsFrames  = 0;
+    this._fpsLast    = performance.now();
+
+    /* ── Off-screen for sampling ──────────────── */
+    this.offscreen   = document.createElement('canvas');
+    this.offCtx      = this.offscreen.getContext('2d', { willReadFrequently: true });
+    this._imgDataBuf = null;
+
+    this._bindMouse();
+    this._buildGrid();
+    this._startLoop();
+  }
+
+  /* ═══════════════════════════════════════════════
+     GRID BUILD
+     ═══════════════════════════════════════════════ */
+  _buildGrid() {
+    const cw = this.canvas.width;
+    const ch = this.canvas.height;
+    this.cellW    = cw / this.gridCols;
+    this.gridRows = Math.max(1, Math.round(ch / this.cellW));
+    this.cellH    = ch / this.gridRows;
+    const needed  = this.gridCols * this.gridRows;
+
+    if (this.particles.length !== needed) {
+      this.particles = new Array(needed);
+      for (let r = 0; r < this.gridRows; r++) {
+        for (let c = 0; c < this.gridCols; c++) {
+          const idx = r * this.gridCols + c;
+          const hx  = c * this.cellW + this.cellW * 0.5;
+          const hy  = r * this.cellH + this.cellH * 0.5;
+          this.particles[idx] = { homeX: hx, homeY: hy, x: hx, y: hy, vx: 0, vy: 0, state: 0, col: c, row: r };
+        }
+      }
+    } else {
+      for (let r = 0; r < this.gridRows; r++) {
+        for (let c = 0; c < this.gridCols; c++) {
+          const p = this.particles[r * this.gridCols + c];
+          p.homeX = c * this.cellW + this.cellW * 0.5;
+          p.homeY = r * this.cellH + this.cellH * 0.5;
+          p.col = c; p.row = r;
+        }
+      }
+    }
+
+    this.offscreen.width  = this.gridCols;
+    this.offscreen.height = this.gridRows;
+    this._imgDataBuf = this.offCtx.createImageData(this.gridCols, this.gridRows);
+    this.svgCache.clear();
+    this._lpDirty = true;
+  }
+
+  /* ═══════════════════════════════════════════════
+     SVG SHAPE CACHE
+     Key: "state:style:svgLoaded:color:scale:W"
+     Pre-renders each state to an OffscreenCanvas.
+     ═══════════════════════════════════════════════ */
+  _getCache(state) {
+    if (state === 0) return null;
+    const svgKey = this.svgImage ? 'svg' : 'builtin';
+    const key    = `${state}:${this.shapeStyle}:${svgKey}:${this.dotColor}:${this.dotScale}:${this.cellW | 0}:${this.svgRotation | 0}`;
+    let oc = this.svgCache.get(key);
+    if (oc) return oc;
+
+    const w = Math.ceil(this.cellW);
+    const h = Math.ceil(this.cellH);
+    oc = document.createElement('canvas');
+    oc.width = w; oc.height = h;
+    const octx = oc.getContext('2d');
+    this._drawShape(octx, state, this.dotColor, w, h);
+    this.svgCache.set(key, oc);
+    return oc;
+  }
+
+  /* Seven luminance states. If SVG is loaded, use it. Otherwise use built-in shapes. */
+  _drawShape(ctx, state, color, w, h) {
+    const FRACS = [0, 0.10, 0.21, 0.33, 0.45, 0.58, 1.0];
+    const frac  = FRACS[Math.min(state, 6)];
+    const maxR  = Math.min(w, h) * 0.5 * this.dotScale;
+    const r     = maxR * frac;
+    const cx    = w * 0.5, cy = h * 0.5;
+
+    /* ── SVG shape ──────────────────────────── */
+    if (this.svgImage) {
+      if (state === 0) return;
+      const size = (state === 6 ? 1.0 : frac) * this.dotScale;
+      const sw   = w * size;
+      const sh   = h * size;
+      ctx.globalAlpha = this.dotOpacity;
+      ctx.save();
+      ctx.translate(w * 0.5, h * 0.5);
+      if (this.svgRotation) ctx.rotate(this.svgRotation * Math.PI / 180);
+      ctx.drawImage(this.svgImage, -sw * 0.5, -sh * 0.5, sw, sh);
+      // Tint: paint color over SVG using source-atop
+      if (this.tintSVG) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = color;
+        ctx.fillRect(-sw * 0.5, -sh * 0.5, sw, sh);
+        ctx.globalCompositeOperation = 'source-over';
+      }
+      ctx.restore();
+      ctx.globalAlpha = 1;
+      return;
+    }
+
+    /* ── Built-in shapes ────────────────────── */
+    ctx.globalAlpha = this.dotOpacity;
+    ctx.fillStyle   = color;
+    ctx.strokeStyle = color;
+
+    switch (this.shapeStyle) {
+      case 'circle':
+        if (state === 6) { ctx.fillRect(0, 0, w, h); break; }
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+        break;
+      case 'square':
+        if (state === 6) { ctx.fillRect(0, 0, w, h); break; }
+        ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
+        break;
+      case 'diamond':
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI / 4);
+        const s = state === 6 ? maxR * Math.SQRT2 : r * Math.SQRT2;
+        ctx.fillRect(-s*0.5, -s*0.5, s, s);
+        ctx.restore();
+        break;
+      case 'cross': {
+        const arm = r, t = Math.max(1, arm * 0.45);
+        if (state === 6) { ctx.fillRect(0, 0, w, h); break; }
+        ctx.fillRect(cx - t, cy - arm, t*2, arm*2);
+        ctx.fillRect(cx - arm, cy - t, arm*2, t*2);
+        break;
+      }
+      case 'ring':
+        if (state === 6)     { ctx.fillRect(0, 0, w, h); break; }
+        if (state <= 1)      { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI*2); ctx.fill(); break; }
+        ctx.beginPath();
+        ctx.arc(cx, cy, r, 0, Math.PI*2);
+        ctx.arc(cx, cy, Math.max(0, r * (1 - frac*0.6)), 0, Math.PI*2, true);
+        ctx.fill();
+        break;
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  /* ═══════════════════════════════════════════════
+     SOURCE SAMPLING
+     ═══════════════════════════════════════════════ */
+  _makeVideo() {
+    const v = document.createElement('video');
+    v.autoplay = true; v.muted = true; v.playsInline = true;
+    return v;
+  }
+
+  _sampleSource() {
+    const w = this.gridCols, h = this.gridRows;
+    if (this.sourceMode === 'test') {
+      this._testT += 0.016;
+      return this._fillTestPattern(w, h, this._testT);
+    }
+    if (this.sourceMode === 'image' && this.imageEl) {
+      this.offCtx.drawImage(this.imageEl, 0, 0, w, h);
+    } else if (this.sourceMode === 'video' && this.videoEl.readyState >= 2) {
+      this.offCtx.drawImage(this.videoEl, 0, 0, w, h);
+    } else {
+      this._testT += 0.016;
+      return this._fillTestPattern(w, h, this._testT);
+    }
+    return this.offCtx.getImageData(0, 0, w, h);
+  }
+
+  _fillTestPattern(w, h, t) {
+    const d = this._imgDataBuf.data;
+    const a = t * 0.7, b = t * 0.55, c = t * 0.4;
+    for (let y = 0; y < h; y++) {
+      const ny = y / h;
+      for (let x = 0; x < w; x++) {
+        const nx = x / w;
+        const v  = (Math.sin(nx*Math.PI*7+a)*0.33 + Math.sin(ny*Math.PI*5-b)*0.33 + Math.sin((nx+ny)*Math.PI*4.5+c)*0.34)*0.5+0.5;
+        const lum = v * 255 | 0;
+        const i = (y*w+x)*4;
+        d[i] = d[i+1] = d[i+2] = lum; d[i+3] = 255;
+      }
+    }
+    this.offCtx.putImageData(this._imgDataBuf, 0, 0);
+    return this._imgDataBuf;
+  }
+
+  _luminanceAt(imgData, gx, gy) {
+    const w = this.gridCols, h = this.gridRows;
+    const ix = ((Math.floor(gx) % w) + w) % w;
+    const iy = ((Math.floor(gy) % h) + h) % h;
+    const i  = (iy * w + ix) * 4;
+    const d  = imgData.data;
+    return 0.299*d[i] + 0.587*d[i+1] + 0.114*d[i+2];
+  }
+
+  _rgbAt(imgData, gx, gy) {
+    const w = this.gridCols, h = this.gridRows;
+    const ix = Math.min(w-1, Math.max(0, Math.floor(gx)));
+    const iy = Math.min(h-1, Math.max(0, Math.floor(gy)));
+    const i  = (iy * w + ix) * 4;
+    const d  = imgData.data;
+    return [d[i], d[i+1], d[i+2]];
+  }
+
+  _lumToState(lum255) {
+    let n = lum255 / 255;
+    if (this.invertLum) n = 1 - n;
+    // Monotone: binary — shape is fully ON (state 6) or fully OFF (state 0)
+    if (this.monotone) return n >= this.monotoneThr ? 6 : 0;
+    // Graduated halftone — 7 size states
+    if (n < 0.06) return 0;
+    if (n < 0.18) return 1;
+    if (n < 0.33) return 2;
+    if (n < 0.50) return 3;
+    if (n < 0.66) return 4;
+    if (n < 0.82) return 5;
+    return 6;
+  }
+
+  /* ═══════════════════════════════════════════════
+     LOW POLY — Jittered grid triangulation
+     ═══════════════════════════════════════════════ */
+  computeLowPolyMesh() {
+    const cw   = this.canvas.width;
+    const ch   = this.canvas.height;
+    const cols = this.lpCols;
+    const rows = Math.round(cols * ch / cw);
+    const csx  = cw / cols;
+    const csy  = ch / rows;
+    const j    = this.lpJitter;
+
+    // Build point grid with edge-pinning
+    const pts  = [];
+    for (let r = 0; r <= rows; r++) {
+      for (let c = 0; c <= cols; c++) {
+        const edgeX = (c === 0 || c === cols);
+        const edgeY = (r === 0 || r === rows);
+        const jx    = edgeX ? 0 : (Math.random() - 0.5) * csx * j;
+        const jy    = edgeY ? 0 : (Math.random() - 0.5) * csy * j;
+        pts.push({ x: c * csx + jx, y: r * csy + jy });
+      }
+    }
+
+    // Build triangles: 2 per grid cell, alternating diagonal
+    const tris = [];
+    const stride = cols + 1;
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const tl = r * stride + c;
+        const tr = tl + 1;
+        const bl = (r+1) * stride + c;
+        const br = bl + 1;
+        if ((r + c) % 2 === 0) {
+          tris.push([pts[tl], pts[tr], pts[br]]);
+          tris.push([pts[tl], pts[br], pts[bl]]);
+        } else {
+          tris.push([pts[tl], pts[tr], pts[bl]]);
+          tris.push([pts[tr], pts[br], pts[bl]]);
+        }
+      }
+    }
+    this.lpTriangles = tris;
+    this._lpDirty    = false;
+  }
+
+  _frameLowPoly(imgData) {
+    if (this._lpDirty || this.lpTriangles.length === 0) this.computeLowPolyMesh();
+
+    const ctx  = this.ctx;
+    const cw   = this.canvas.width;
+    const ch   = this.canvas.height;
+    const tris = this.lpTriangles;
+    const gCols = this.gridCols;
+    const gRows = this.gridRows;
+
+    ctx.lineWidth = this.lpShowEdges ? 0.5 : 0;
+
+    for (let i = 0; i < tris.length; i++) {
+      const [a, b, c] = tris[i];
+
+      // Centroid position → sample image
+      const cx  = (a.x + b.x + c.x) / 3;
+      const cy  = (a.y + b.y + c.y) / 3;
+      const gx  = cx / cw * gCols;
+      const gy  = cy / ch * gRows;
+      const lum = this._luminanceAt(imgData, gx, gy);
+
+      // Fill color
+      let fillStyle;
+      if (this.monotone) {
+        // Flat monotone: skip triangles below threshold, rest = solid dot color
+        if (lum / 255 < this.monotoneThr) { ctx.globalAlpha = 1; continue; }
+        fillStyle = this.dotColor;
+        ctx.globalAlpha = this.dotOpacity;
+      } else if (this.lpUseImageColor) {
+        const [r, g, bv] = this._rgbAt(imgData, gx, gy);
+        fillStyle = `rgb(${r},${g},${bv})`;
+      } else {
+        // Use dot color, modulate opacity by luminance
+        fillStyle = this.dotColor;
+        ctx.globalAlpha = lum / 255 * this.dotOpacity;
+      }
+
+      // Draw filled triangle
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      ctx.lineTo(c.x, c.y);
+      ctx.closePath();
+
+      if (this.svgImage) {
+        /* ── SVG mode: clip triangle → draw SVG ── */
+        ctx.save();
+        ctx.clip();
+        // Tint with luminance if tintSVG, else raw SVG colors
+        if (this.tintSVG) {
+          const [r, g, bv] = this._rgbAt(imgData, gx, gy);
+          ctx.globalAlpha = this.dotOpacity;
+          ctx.drawImage(this.svgImage, 0, 0, cw, ch);
+          ctx.globalCompositeOperation = 'source-atop';
+          ctx.fillStyle = `rgb(${r},${g},${bv})`;
+          ctx.fillRect(0, 0, cw, ch);
+          ctx.globalCompositeOperation = 'source-over';
+        } else {
+          ctx.globalAlpha = this.dotOpacity;
+          ctx.drawImage(this.svgImage, 0, 0, cw, ch);
+        }
+        ctx.restore();
+      } else {
+        ctx.fillStyle = fillStyle;
+        ctx.fill();
+        if (this.lpShowEdges) {
+          ctx.strokeStyle = this.bgColor;
+          ctx.stroke();
+        }
+      }
+
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     GUIDED STRUCTURE — tiled SVG or shape grid
+     Each cell shows the shape in an orientation
+     determined by (row + col) parity, visible/sized
+     by luminance.
+     ═══════════════════════════════════════════════ */
+  _frameGuided(imgData) {
+    const ctx   = this.ctx;
+    const cw    = this.canvas.width;
+    const ch    = this.canvas.height;
+    const cols  = this.guidedCols;
+    const rows  = Math.max(1, Math.round(cols * ch / cw));
+    const cellW = cw / cols;
+    const cellH = ch / rows;
+    const gCols = this.gridCols;
+    const gRows = this.gridRows;
+    const thr   = this.guidedThreshold;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        // Sample luminance at this cell
+        const gx  = c / cols * gCols + 0.5;
+        const gy  = r / rows * gRows + 0.5;
+        const lum = this._luminanceAt(imgData, gx, gy);
+        const n   = lum / 255;
+
+        // Skip if below threshold (monotone uses its own threshold)
+        const effectiveThr = this.monotone ? this.monotoneThr : thr;
+        if (n < effectiveThr) continue;
+
+        // Scale factor — monotone always 1.0 (no luminance graduation)
+        const scale = (!this.monotone && this.guidedScaleLum)
+          ? ((n - thr) / (1 - thr + 0.001))
+          : 1.0;
+        if (scale < 0.05) continue;
+
+        // Rotation angle based on tiling mode and cell position
+        let angle = 0;
+        const parity = (r + c) % 4;
+        switch (this.guidedTiling) {
+          case 'alt':
+            angle = parity % 2 === 0 ? 0 : Math.PI;
+            break;
+          case 'quad':
+            angle = parity * Math.PI * 0.5;
+            break;
+          case 'mirror':
+            angle = parity % 2 === 0 ? 0 : Math.PI * 0.5;
+            if ((r % 2) === 1) angle += Math.PI;
+            break;
+        }
+
+        // Cell center
+        const px = c * cellW + cellW * 0.5;
+        const py = r * cellH + cellH * 0.5;
+
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(angle);
+        ctx.globalAlpha = Math.min(1, scale) * this.dotOpacity;
+
+        const hw = cellW * 0.5 * scale * this.dotScale;
+        const hh = cellH * 0.5 * scale * this.dotScale;
+
+        if (this.svgImage) {
+          ctx.drawImage(this.svgImage, -hw, -hh, hw * 2, hh * 2);
+          if (this.tintSVG) {
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = this.dotColor;
+            ctx.fillRect(-hw, -hh, hw * 2, hh * 2);
+            ctx.globalCompositeOperation = 'source-over';
+          }
+        } else {
+          // Draw built-in shape at scaled size
+          ctx.fillStyle = this.dotColor;
+          ctx.strokeStyle = this.dotColor;
+          this._drawBuiltinAtSize(ctx, -hw, -hh, hw * 2, hh * 2);
+        }
+
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     SHAPE FILL MODE
+     Body SVG defines the mask region.
+     Pattern SVG tiles inside the masked area.
+     ═══════════════════════════════════════════════ */
+
+  /** Rasterize body SVG to offscreen canvas for fast pixel-level mask sampling. */
+  _rasterizeBodySVG() {
+    if (!this.sfBodySVG) return;
+    const res = this.sfBodyRes;
+    if (!this.sfBodyOffscreen) {
+      this.sfBodyOffscreen = document.createElement('canvas');
+      this.sfBodyOffscreen.width = res;
+      this.sfBodyOffscreen.height = res;
+      this.sfBodyOffCtx = this.sfBodyOffscreen.getContext('2d', { willReadFrequently: true });
+    }
+    this.sfBodyOffCtx.clearRect(0, 0, res, res);
+    this.sfBodyOffCtx.drawImage(this.sfBodySVG, 0, 0, res, res);
+    this.sfBodyData = this.sfBodyOffCtx.getImageData(0, 0, res, res).data;
+  }
+
+  /** Returns true when canvas-normalised position (nx, ny) falls inside the body mask. */
+  _isInsideBody(nx, ny) {
+    if (!this.sfBodyData) return false;
+    const res = this.sfBodyRes;
+    const bx  = Math.min(res - 1, Math.max(0, Math.floor(nx * res)));
+    const by  = Math.min(res - 1, Math.max(0, Math.floor(ny * res)));
+    const i   = (by * res + bx) * 4;
+    const d   = this.sfBodyData;
+    // Primary: alpha channel (works for SVGs with transparent background)
+    if (d[i + 3] > this.sfThreshold) return true;
+    // Fallback: luminance (for opaque-background SVGs)
+    const lum = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2];
+    return lum > this.sfThreshold;
+  }
+
+  _frameShapeFill() {
+    const ctx = this.ctx;
+    const cw  = this.canvas.width;
+    const ch  = this.canvas.height;
+
+    // No body loaded — show instruction
+    if (!this.sfBodySVG) {
+      ctx.fillStyle = 'rgba(244,244,240,0.10)';
+      ctx.textAlign = 'center';
+      ctx.font = '600 13px Inter, sans-serif';
+      ctx.fillText('Upload a Body SVG to define the mask', cw * 0.5, ch * 0.5 - 10);
+      ctx.font = '400 11px Inter, sans-serif';
+      ctx.fillStyle = 'rgba(244,244,240,0.04)';
+      ctx.fillText('Then upload a Pattern SVG as the fill unit', cw * 0.5, ch * 0.5 + 12);
+      return;
+    }
+
+    // 1. Draw body shape as background layer
+    if (this.sfShowBody) {
+      ctx.drawImage(this.sfBodySVG, 0, 0, cw, ch);
+      if (this.sfTintBody) {
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.globalAlpha = this.sfBodyOpacity;
+        ctx.fillStyle = this.sfBodyColor;
+        ctx.fillRect(0, 0, cw, ch);
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    // 2. Pattern grid — only inside body mask
+    const cols  = this.sfGridCols;
+    const rows  = Math.max(1, Math.round(cols * ch / cw));
+    const cellW = cw / cols;
+    const cellH = ch / rows;
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const px = c * cellW + cellW * 0.5;
+        const py = r * cellH + cellH * 0.5;
+
+        if (!this._isInsideBody(px / cw, py / ch)) continue;
+
+        const sw = cellW * this.sfPatternScale;
+        const sh = cellH * this.sfPatternScale;
+        const sx = px - sw * 0.5;
+        const sy = py - sh * 0.5;
+
+        ctx.globalAlpha = this.dotOpacity;
+
+        if (this.sfPatternSVG) {
+          ctx.save();
+          ctx.translate(px, py);
+          if (this.sfPatternRotation) ctx.rotate(this.sfPatternRotation * Math.PI / 180);
+          ctx.drawImage(this.sfPatternSVG, -sw * 0.5, -sh * 0.5, sw, sh);
+          if (this.sfTintPattern) {
+            ctx.globalCompositeOperation = 'source-atop';
+            ctx.fillStyle = this.dotColor;
+            ctx.fillRect(-sw * 0.5, -sh * 0.5, sw, sh);
+            ctx.globalCompositeOperation = 'source-over';
+          }
+          ctx.restore();
+        } else {
+          // Fallback: filled circle
+          ctx.fillStyle = this.dotColor;
+          ctx.beginPath();
+          ctx.arc(px, py, Math.min(cellW, cellH) * 0.5 * this.sfPatternScale, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.globalAlpha = 1;
+      }
+    }
+  }
+
+  async loadSFPatternSVG(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => { this.sfPatternSVG = img; this.sfPatternDataURL = e.target.result; resolve(img); };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async loadSFBodySVG(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload = () => {
+          this.sfBodySVG    = img;
+          this.sfBodyDataURL = e.target.result;
+          this._rasterizeBodySVG();
+          resolve(img);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  /**
+   * SVG Export — Shape Fill mode.
+   *
+   * IMPORTANT: Browsers block "SVG-inside-SVG" via data: URLs for security
+   * (the embedded <image href="data:image/svg+xml;..."> renders as nothing).
+   * Fix: pre-rasterize both SVGs to PNG on temporary canvases — with tinting
+   * already baked in — then embed those PNG data URLs instead.
+   */
+  _svgExportShapeFill(lines, cw, ch) {
+    const f = n => n.toFixed(2);
+
+    /* ── 1. Pre-rasterize body SVG → PNG (tinting baked in) ── */
+    let bodyPNG = null;
+    if (this.sfBodySVG) {
+      const res  = this.sfBodyRes * 2;                    // 1024 px — high enough for sharp export
+      const bTmp = document.createElement('canvas');
+      bTmp.width = res; bTmp.height = res;
+      const bCtx = bTmp.getContext('2d');
+      bCtx.drawImage(this.sfBodySVG, 0, 0, res, res);
+      if (this.sfTintBody) {
+        bCtx.globalCompositeOperation = 'source-atop';
+        bCtx.globalAlpha = this.sfBodyOpacity;            // bake opacity into the PNG
+        bCtx.fillStyle   = this.sfBodyColor;
+        bCtx.fillRect(0, 0, res, res);
+        bCtx.globalCompositeOperation = 'source-over';
+        bCtx.globalAlpha = 1;
+      }
+      bodyPNG = bTmp.toDataURL('image/png');
+    }
+
+    /* ── 2. Pre-rasterize pattern SVG → PNG (rotation + tinting baked in) ── */
+    let patternPNG = null;
+    if (this.sfPatternSVG) {
+      const res  = 256;
+      const pTmp = document.createElement('canvas');
+      pTmp.width = res; pTmp.height = res;
+      const pCtx = pTmp.getContext('2d');
+      pCtx.translate(res * 0.5, res * 0.5);
+      if (this.sfPatternRotation) pCtx.rotate(this.sfPatternRotation * Math.PI / 180);
+      pCtx.drawImage(this.sfPatternSVG, -res * 0.5, -res * 0.5, res, res);
+      if (this.sfTintPattern) {
+        pCtx.globalCompositeOperation = 'source-atop';
+        pCtx.fillStyle = this.dotColor;
+        pCtx.fillRect(-res * 0.5, -res * 0.5, res, res);
+        pCtx.globalCompositeOperation = 'source-over';
+      }
+      patternPNG = pTmp.toDataURL('image/png');
+    }
+
+    /* ── 3. Emit body layer ── */
+    if (this.sfShowBody && bodyPNG) {
+      // Opacity was baked into the PNG if tintBody; keep raw opacity only when not tinting
+      const opAttr = (!this.sfTintBody && this.sfBodyOpacity < 1)
+        ? ` opacity="${this.sfBodyOpacity.toFixed(2)}"` : '';
+      lines.push(`<image href="${bodyPNG}" x="0" y="0" width="${cw}" height="${ch}"${opAttr}/>`);
+    }
+
+    if (!this.sfBodyData) return;   // body mask not ready — nothing to tile
+
+    /* ── 4. Grid of pattern tiles ── */
+    const cols  = this.sfGridCols;
+    const rows  = Math.max(1, Math.round(cols * ch / cw));
+    const cellW = cw / cols;
+    const cellH = ch / rows;
+    const opAttr = this.dotOpacity < 1 ? ` opacity="${this.dotOpacity.toFixed(2)}"` : '';
+
+    const shapes = [];
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const px = c * cellW + cellW * 0.5;
+        const py = r * cellH + cellH * 0.5;
+        if (!this._isInsideBody(px / cw, py / ch)) continue;
+
+        const sw = cellW * this.sfPatternScale;
+        const sh = cellH * this.sfPatternScale;
+        const sx = px - sw * 0.5;
+        const sy = py - sh * 0.5;
+
+        if (patternPNG) {
+          // PNG already has tinting baked in — no filter needed
+          shapes.push(`<image href="${patternPNG}" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"/>`);
+        } else {
+          // Fallback: circle shape
+          const r2 = Math.min(cellW, cellH) * 0.5 * this.sfPatternScale;
+          shapes.push(`<circle cx="${f(px)}" cy="${f(py)}" r="${f(r2)}"/>`);
+        }
+      }
+    }
+
+    if (shapes.length > 0) {
+      // For PNG tiles: wrap in group with dotOpacity only (tinting already baked in)
+      // For circle fallback: also add fill color
+      const fillAttr = patternPNG ? '' : ` fill="${this.dotColor}"`;
+      lines.push(`<g${fillAttr}${opAttr}>${shapes.join('')}</g>`);
+    }
+  }
+
+  /** Draw built-in shape at explicit coordinates (for guided mode). */
+  _drawBuiltinAtSize(ctx, x, y, w, h) {
+    const cx = x + w * 0.5, cy = y + h * 0.5;
+    const r  = Math.min(w, h) * 0.5;
+    switch (this.shapeStyle) {
+      case 'square':   ctx.fillRect(x, y, w, h); break;
+      case 'diamond':
+        ctx.save(); ctx.translate(cx, cy); ctx.rotate(Math.PI / 4);
+        ctx.fillRect(-r*0.7, -r*0.7, r*1.4, r*1.4); ctx.restore(); break;
+      default:  // circle
+        ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill();
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     HALFTONE + PHYSICS FRAME
+     ═══════════════════════════════════════════════ */
+  _frameHalftone(imgData) {
+    const cw  = this.canvas.width, ch = this.canvas.height;
+    const ctx = this.ctx;
+    const ag  = this.antiGravity;
+    const mx  = this.mouse.x, my = this.mouse.y;
+    const repR = this.repulsionR, repF = this.repulsionStr;
+    const particles = this.particles;
+    const n = particles.length;
+    const hw = this.cellW * 0.5, hh = this.cellH * 0.5;
+    const gCols = this.gridCols, gRows = this.gridRows;
+
+    for (let i = 0; i < n; i++) {
+      const p = particles[i];
+
+      if (ag) {
+        p.vy -= this.buoyancy;
+        if (this.turbulence > 0) {
+          p.vx += (Math.random() - 0.5) * this.turbulence;
+          p.vy += (Math.random() - 0.5) * this.turbulence;
+        }
+        const dx = p.x - mx, dy = p.y - my;
+        const d2 = dx*dx + dy*dy;
+        if (d2 < repR*repR && d2 > 0.01) {
+          const d = Math.sqrt(d2), f = (1 - d/repR) * repF / d;
+          p.vx += dx * f; p.vy += dy * f;
+        }
+        p.vx *= this.drag; p.vy *= this.drag;
+        p.x  += p.vx;     p.y  += p.vy;
+
+        // Screen wrap
+        if (p.y < -this.cellH) {
+          p.y = ch + this.cellH * (1 + Math.random());
+          p.vy = 0;
+          p.x = p.homeX + (Math.random()-0.5) * cw * 0.25;
+          p.vx = 0;
+        }
+        if (p.x < -this.cellW) p.x = cw + this.cellW;
+        if (p.x > cw + this.cellW) p.x = -this.cellW;
+
+        // Dynamic luminance at floating position
+        const gx = (p.x / cw) * gCols;
+        const gy = (p.y / ch) * gRows;
+        p.state = this._lumToState(this._luminanceAt(imgData, gx, gy));
+      } else {
+        p.vx *= 0.78; p.vy *= 0.78;
+        const ex = p.homeX - p.x, ey = p.homeY - p.y;
+        p.x += ex * this.snapStrength + p.vx;
+        p.y += ey * this.snapStrength + p.vy;
+        if (Math.abs(ex) < 0.1 && Math.abs(ey) < 0.1) { p.x = p.homeX; p.y = p.homeY; p.vx = p.vy = 0; }
+        p.state = this._lumToState(this._luminanceAt(imgData, p.col, p.row));
+      }
+
+      if (p.state === 0) continue;
+      const cached = this._getCache(p.state);
+      if (cached) ctx.drawImage(cached, p.x - hw, p.y - hh, this.cellW, this.cellH);
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     MAIN LOOP
+     ═══════════════════════════════════════════════ */
+  _startLoop() {
+    const tick = () => { this.rafId = requestAnimationFrame(tick); this._frame(); };
+    tick();
+  }
+
+  _frame() {
+    const now = performance.now();
+    this._fpsFrames++;
+    if (now - this._fpsLast >= 500) {
+      this._fps = (this._fpsFrames / ((now - this._fpsLast) / 1000)) | 0;
+      this._fpsFrames = 0; this._fpsLast = now;
+      this._updateStats();
+    }
+
+    const cw = this.canvas.width, ch = this.canvas.height;
+    const imgData = this._sampleSource();
+
+    this.ctx.fillStyle = this.bgColor;
+    this.ctx.fillRect(0, 0, cw, ch);
+
+    switch (this.renderMode) {
+      case 'lowpoly':   this._frameLowPoly(imgData);  break;
+      case 'guided':    this._frameGuided(imgData);   break;
+      case 'shapefill': this._frameShapeFill();       break;
+      default:         this._frameHalftone(imgData); break;
+    }
+  }
+
+  /* ═══════════════════════════════════════════════
+     MOUSE / TOUCH
+     ═══════════════════════════════════════════════ */
+  _bindMouse() {
+    const c = this.canvas;
+    const toCanvas = e => {
+      const r  = c.getBoundingClientRect();
+      const sx = c.width / r.width, sy = c.height / r.height;
+      const t  = e.touches ? e.touches[0] : e;
+      this.mouse.x = (t.clientX - r.left) * sx;
+      this.mouse.y = (t.clientY - r.top)  * sy;
+    };
+    c.addEventListener('mousemove', toCanvas);
+    c.addEventListener('touchmove', e => { e.preventDefault(); toCanvas(e); }, { passive: false });
+    const clear = () => { this.mouse.x = -9999; this.mouse.y = -9999; };
+    c.addEventListener('mouseleave', clear);
+    c.addEventListener('touchend', clear);
+  }
+
+  /* ═══════════════════════════════════════════════
+     STATS
+     ═══════════════════════════════════════════════ */
+  _updateStats() {
+    const el = document.getElementById('dp-stats');
+    if (!el) return;
+    const modeLabel = { halftone: 'Halftone', lowpoly: 'Low Poly', guided: 'Guided Structure' }[this.renderMode];
+    const n = this.renderMode === 'halftone'
+      ? `${this.particles.length.toLocaleString()} particles`
+      : this.renderMode === 'lowpoly'
+        ? `${this.lpTriangles.length.toLocaleString()} triangles`
+        : `${this.guidedCols}×${Math.round(this.guidedCols * this.canvas.height / this.canvas.width)} cells`;
+    el.textContent = `FPS: ${this._fps} · Mode: ${modeLabel} · ${n}`;
+  }
+
+  /* ═══════════════════════════════════════════════
+     PUBLIC API
+     ═══════════════════════════════════════════════ */
+  setGridCols(n)    { this.gridCols = Math.max(5, Math.min(100, n|0)); this._buildGrid(); }
+  setRenderMode(m)  { this.renderMode = m; }
+  setShape(s)       { this.shapeStyle = s; this.svgCache.clear(); }
+  setDotColor(hex)  { this.dotColor = hex; this.svgCache.clear(); }
+  setDotScale(v)    { this.dotScale = v; this.svgCache.clear(); }
+  setDotOpacity(v)  { this.dotOpacity = v; this.svgCache.clear(); }
+  setInvertLum(on)  { this.invertLum = on; }
+  setTintSVG(on)    { this.tintSVG = on; this.svgCache.clear(); }
+
+  setAntiGravity(on) {
+    this.antiGravity = on;
+    if (!on) for (const p of this.particles) { p.vx *= 0.3; p.vy *= 0.3; }
+  }
+
+  /** Load SVG file and use it as the shape unit. */
+  async loadSVGShape(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = e => {
+        const img = new Image();
+        img.onload  = () => {
+          this.svgImage   = img;
+          this.svgDataURL = e.target.result;
+          this.svgCache.clear();
+          this._lpDirty = true;
+          resolve(img);
+        };
+        img.onerror = reject;
+        img.src = e.target.result;
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  clearSVGShape() {
+    this.svgImage   = null;
+    this.svgDataURL = null;
+    this.svgCache.clear();
+    this._lpDirty = true;
+  }
+
+  async startWebcam() {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      this.videoEl.srcObject = stream;
+      await this.videoEl.play();
+      this.sourceMode = 'video';
+      return true;
+    } catch (e) { return false; }
+  }
+
+  stopWebcam() {
+    if (this.videoEl.srcObject) {
+      this.videoEl.srcObject.getTracks().forEach(t => t.stop());
+      this.videoEl.srcObject = null;
+    }
+  }
+
+  async loadImage(src) {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload  = () => { this.imageEl = img; this.sourceMode = 'image'; resolve(); };
+      img.onerror = reject;
+      img.src     = src;
+    });
+  }
+
+  setTestMode() {
+    this.stopWebcam(); this.imageEl = null; this.sourceMode = 'test';
+  }
+
+  resize(w, h) {
+    this.canvas.width = w; this.canvas.height = h;
+    this._buildGrid();
+    this._lpDirty = true;
+  }
+
+  exportFrame() { return this.canvas.toDataURL('image/png'); }
+
+  /* ═══════════════════════════════════════════════
+     SVG EXPORT
+     Converts the current render state to true vector SVG.
+     Halftone  → per-particle shape elements
+     Low Poly  → <polygon> per triangle, centroid-sampled fill
+     Guided    → transformed <g> per visible cell, rotated shape
+     Custom SVG shape embedded as <image> with optional tint filter.
+     ═══════════════════════════════════════════════ */
+  exportSVG() {
+    const cw      = this.canvas.width;
+    const ch      = this.canvas.height;
+    const imgData = this._sampleSource();
+    const lines   = [];
+
+    lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
+    lines.push(`<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${cw} ${ch}" width="${cw}" height="${ch}">`);
+
+    // Defs: tint filter for uploaded SVG shapes
+    const needsTint = (this.svgImage && this.tintSVG);
+    const needsSFTint = (this.renderMode === 'shapefill' && this.sfPatternSVG && this.sfTintPattern);
+    if (needsTint || needsSFTint) {
+      const defs = [];
+      if (needsTint)   defs.push(`<filter id="dp-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
+      if (needsSFTint) defs.push(`<filter id="dp-sf-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
+      lines.push(`<defs>${defs.join('')}</defs>`);
+    }
+
+    // Background rectangle
+    lines.push(`<rect width="${cw}" height="${ch}" fill="${this.bgColor}"/>`);
+
+    // Mode content
+    switch (this.renderMode) {
+      case 'halftone':  this._svgExportHalftone(lines, cw, ch); break;
+      case 'lowpoly':   this._svgExportLowPoly(lines, imgData, cw, ch); break;
+      case 'guided':    this._svgExportGuided(lines, imgData, cw, ch); break;
+      case 'shapefill': this._svgExportShapeFill(lines, cw, ch); break;
+    }
+
+    lines.push(`</svg>`);
+
+    const blob = new Blob([lines.join('\n')], { type: 'image/svg+xml;charset=utf-8' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `ditherpat_${this.renderMode}_${Date.now()}.svg`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+
+  /* Build one SVG shape element at canvas position (cx,cy). */
+  _svgOneShape(cx, cy, state, cellW, cellH) {
+    const FRACS = [0, 0.10, 0.21, 0.33, 0.45, 0.58, 1.0];
+    const frac  = FRACS[Math.min(state, 6)];
+    const maxR  = Math.min(cellW, cellH) * 0.5 * this.dotScale;
+    const r     = state < 6 ? maxR * frac : maxR;
+    const hw    = cellW * 0.5, hh = cellH * 0.5;
+    const f     = n => n.toFixed(2);
+
+    // Uploaded SVG shape → <image> element
+    if (this.svgImage) {
+      const sz   = (state < 6 ? frac : 1) * this.dotScale;
+      const sw   = cellW * sz, sh = cellH * sz;
+      const sx   = cx - sw * 0.5, sy = cy - sh * 0.5;
+      const filt = this.tintSVG ? ' filter="url(#dp-tint)"' : '';
+      return `<image href="${this.svgDataURL}" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"${filt}/>`;
+    }
+
+    // Built-in shapes
+    switch (this.shapeStyle) {
+      case 'circle':
+        if (state === 6) return `<rect x="${f(cx-hw)}" y="${f(cy-hh)}" width="${f(cellW)}" height="${f(cellH)}"/>`;
+        return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>`;
+
+      case 'square':
+        if (state === 6) return `<rect x="${f(cx-hw)}" y="${f(cy-hh)}" width="${f(cellW)}" height="${f(cellH)}"/>`;
+        return `<rect x="${f(cx-r)}" y="${f(cy-r)}" width="${f(r*2)}" height="${f(r*2)}"/>`;
+
+      case 'diamond':
+        return `<polygon points="${f(cx)},${f(cy-r)} ${f(cx+r)},${f(cy)} ${f(cx)},${f(cy+r)} ${f(cx-r)},${f(cy)}"/>`;
+
+      case 'cross': {
+        if (state === 6) return `<rect x="${f(cx-hw)}" y="${f(cy-hh)}" width="${f(cellW)}" height="${f(cellH)}"/>`;
+        const t = Math.max(0.5, r * 0.45);
+        return `<rect x="${f(cx-t)}" y="${f(cy-r)}" width="${f(t*2)}" height="${f(r*2)}"/>` +
+               `<rect x="${f(cx-r)}" y="${f(cy-t)}" width="${f(r*2)}" height="${f(t*2)}"/>`;
+      }
+
+      case 'ring': {
+        if (state === 6) return `<rect x="${f(cx-hw)}" y="${f(cy-hh)}" width="${f(cellW)}" height="${f(cellH)}"/>`;
+        if (state <= 1)  return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>`;
+        // Donut: outer circle + inner circle filled with bg color
+        const inner = Math.max(0, r * (1 - frac * 0.6));
+        return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>` +
+               `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(inner)}" fill="${this.bgColor}"/>`;
+      }
+
+      default:
+        return `<circle cx="${f(cx)}" cy="${f(cy)}" r="${f(r)}"/>`;
+    }
+  }
+
+  _svgExportHalftone(lines, cw, ch) {
+    const op = this.dotOpacity < 1 ? ` opacity="${this.dotOpacity.toFixed(2)}"` : '';
+    lines.push(`<g fill="${this.dotColor}"${op}>`);
+    const particles = this.particles;
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      if (p.state === 0) continue;
+      lines.push(this._svgOneShape(p.x, p.y, p.state, this.cellW, this.cellH));
+    }
+    lines.push(`</g>`);
+  }
+
+  _svgExportLowPoly(lines, imgData, cw, ch) {
+    if (this._lpDirty || this.lpTriangles.length === 0) this.computeLowPolyMesh();
+    const f = n => n.toFixed(1);
+    const tris  = this.lpTriangles;
+    const gCols = this.gridCols, gRows = this.gridRows;
+
+    for (let i = 0; i < tris.length; i++) {
+      const [a, b, c] = tris[i];
+      const tcx = (a.x + b.x + c.x) / 3;
+      const tcy = (a.y + b.y + c.y) / 3;
+      const gx  = tcx / cw * gCols;
+      const gy  = tcy / ch * gRows;
+
+      // Sample luminance once — needed by all branches
+      const lum = this._luminanceAt(imgData, gx, gy);
+
+      let fill, opAttr = '';
+      if (this.monotone) {
+        // Monotone: skip below threshold, flat solid color above it
+        if (lum / 255 < this.monotoneThr) continue;
+        fill = this.dotColor;
+        // opAttr stays '' — no opacity attribute = fully opaque
+      } else if (this.lpUseImageColor) {
+        const [r, g, bv] = this._rgbAt(imgData, gx, gy);
+        fill = `rgb(${r},${g},${bv})`;
+      } else {
+        fill = this.dotColor;
+        opAttr = ` opacity="${(lum / 255 * this.dotOpacity).toFixed(2)}"`;
+      }
+
+      // If custom SVG shape: clip triangle region and draw image inside
+      if (this.svgImage) {
+        const clipId = `cl${i}`;
+        const pts = `${f(a.x)},${f(a.y)} ${f(b.x)},${f(b.y)} ${f(c.x)},${f(c.y)}`;
+        const filt = this.tintSVG ? ` filter="url(#dp-tint)"` : '';
+        lines.push(`<clipPath id="${clipId}"><polygon points="${pts}"/></clipPath>`);
+        lines.push(`<image href="${this.svgDataURL}" x="0" y="0" width="${cw}" height="${ch}" clip-path="url(#${clipId})"${filt}${opAttr}/>`);
+        if (this.lpShowEdges) {
+          lines.push(`<polygon points="${pts}" fill="none" stroke="${this.bgColor}" stroke-width="0.5"/>`);
+        }
+      } else {
+        const pts    = `${f(a.x)},${f(a.y)} ${f(b.x)},${f(b.y)} ${f(c.x)},${f(c.y)}`;
+        const stroke = this.lpShowEdges ? ` stroke="${this.bgColor}" stroke-width="0.5"` : '';
+        lines.push(`<polygon points="${pts}" fill="${fill}"${opAttr}${stroke}/>`);
+      }
+    }
+  }
+
+  _svgExportGuided(lines, imgData, cw, ch) {
+    const cols  = this.guidedCols;
+    const rows  = Math.max(1, Math.round(cols * ch / cw));
+    const cellW = cw / cols;
+    const cellH = ch / rows;
+    const thr   = this.guidedThreshold;
+    const f     = n => n.toFixed(2);
+    const op    = this.dotOpacity < 1 ? ` opacity="${this.dotOpacity.toFixed(2)}"` : '';
+
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < cols; c++) {
+        const gx  = c / cols * this.gridCols + 0.5;
+        const gy  = r / rows * this.gridRows + 0.5;
+        const lum = this._luminanceAt(imgData, gx, gy);
+        const n   = lum / 255;
+        // Monotone uses its own threshold; normal mode uses guidedThreshold
+        const effectiveThr = this.monotone ? this.monotoneThr : thr;
+        if (n < effectiveThr) continue;
+
+        // Monotone always renders at full scale — no luminance graduation
+        const scale = (!this.monotone && this.guidedScaleLum) ? (n - thr) / (1 - thr + 0.001) : 1.0;
+        if (scale < 0.05) continue;
+
+        const parity = (r + c) % 4;
+        let angle = 0;
+        switch (this.guidedTiling) {
+          case 'alt':    angle = parity % 2 === 0 ? 0 : 180; break;
+          case 'quad':   angle = parity * 90; break;
+          case 'mirror': angle = parity % 2 === 0 ? 0 : 90; if (r % 2 === 1) angle += 180; break;
+        }
+
+        const px  = c * cellW + cellW * 0.5;
+        const py  = r * cellH + cellH * 0.5;
+        const hw  = cellW * 0.5 * scale * this.dotScale;
+        const hh  = cellH * 0.5 * scale * this.dotScale;
+        const rot = angle !== 0 ? ` rotate(${angle})` : '';
+        const xfm = `translate(${f(px)},${f(py)})${rot}`;
+
+        let shapeEl;
+        if (this.svgImage) {
+          const filt = this.tintSVG ? ' filter="url(#dp-tint)"' : '';
+          shapeEl = `<image href="${this.svgDataURL}" x="${f(-hw)}" y="${f(-hh)}" width="${f(hw*2)}" height="${f(hh*2)}"${filt}/>`;
+        } else {
+          shapeEl = this._svgBuiltinLocal(hw, hh);
+        }
+        lines.push(`<g transform="${xfm}" fill="${this.dotColor}"${op}>${shapeEl}</g>`);
+      }
+    }
+  }
+
+  /** Built-in shape centered at local (0,0) — for use inside a translated <g>. */
+  _svgBuiltinLocal(hw, hh) {
+    const r = Math.min(hw, hh);
+    const f = n => n.toFixed(2);
+    switch (this.shapeStyle) {
+      case 'square':  return `<rect x="${f(-hw)}" y="${f(-hh)}" width="${f(hw*2)}" height="${f(hh*2)}"/>`;
+      case 'diamond': return `<polygon points="0,${f(-r)} ${f(r)},0 0,${f(r)} ${f(-r)},0"/>`;
+      case 'cross': {
+        const t = r * 0.45;
+        return `<rect x="${f(-t)}" y="${f(-r)}" width="${f(t*2)}" height="${f(r*2)}"/>` +
+               `<rect x="${f(-r)}" y="${f(-t)}" width="${f(r*2)}" height="${f(t*2)}"/>`;
+      }
+      case 'ring': {
+        const inner = r * 0.5;
+        return `<circle r="${f(r)}"/><circle r="${f(inner)}" fill="${this.bgColor}"/>`;
+      }
+      default: return `<circle r="${f(r)}"/>`;
+    }
+  }
+  destroy()     { if (this.rafId) cancelAnimationFrame(this.rafId); this.stopWebcam(); }
+}
+
+
+/* ════════════════════════════════════════════════════════════════════
+   UI CONTROLLER
+   ════════════════════════════════════════════════════════════════════ */
+
+let engine    = null;
+let toastTimer = null;
+
+const $ = id => document.getElementById(id);
+
+function showToast(msg, dur = 2800) {
+  const el = $('dp-toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+function setActiveSource(id) {
+  document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
+  $(id)?.classList.add('active');
+}
+
+function switchRenderMode(mode) {
+  document.querySelectorAll('.rmode-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-rmode="${mode}"]`)?.classList.add('active');
+  $('sub-halftone').classList.toggle('visible',   mode === 'halftone');
+  $('sub-lowpoly').classList.toggle('visible',    mode === 'lowpoly');
+  $('sub-guided').classList.toggle('visible',     mode === 'guided');
+  $('sub-shapefill').classList.toggle('visible',  mode === 'shapefill');
+  $('physics-section').style.display = mode === 'halftone' ? '' : 'none';
+  engine.setRenderMode(mode);
+  updateStats();
+}
+
+function updateStats() {
+  const labels = { halftone:'Halftone · physics', lowpoly:'Low Poly · triangulate', guided:'Guided Structure · tile' };
+  $('dp-stats').textContent = `Mode: ${labels[engine?.renderMode || 'halftone']}`;
+}
+
+function syncGridInfo() {
+  if (!engine) return;
+  const total = engine.gridCols * engine.gridRows;
+  $('grid-info').textContent = `${engine.gridCols} × ${engine.gridRows} = ${total.toLocaleString()} particles`;
+}
+
+function initEngine() {
+  const canvas = $('dp-canvas');
+  const area   = $('dp-canvas-area');
+
+  function fitCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const w   = area.clientWidth, h = area.clientHeight;
+    canvas.width  = w * dpr; canvas.height = h * dpr;
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+    if (engine) engine.resize(canvas.width, canvas.height);
+  }
+
+  fitCanvas();
+  engine = new DitherPatEngine(canvas);
+  syncGridInfo();
+
+  let resizeTimer;
+  window.addEventListener('resize', () => {
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => { fitCanvas(); syncGridInfo(); engine._lpDirty = true; }, 150);
+  });
+
+  /* ── Source ────────────────────────────────── */
+  $('src-test').addEventListener('click', () => {
+    engine.setTestMode(); setActiveSource('src-test');
+    $('source-hint').textContent = 'Animated procedural pattern';
+    showToast('Test pattern active');
+  });
+
+  $('src-webcam').addEventListener('click', async () => {
+    showToast('Requesting camera…', 1500);
+    const ok = await engine.startWebcam();
+    if (ok) { setActiveSource('src-webcam'); $('source-hint').textContent = 'Live webcam'; showToast('✓ Webcam active'); }
+    else showToast('Camera denied — check permissions');
+  });
+
+  $('src-image').addEventListener('click', () => $('img-file-input').click());
+  $('img-file-input').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    const url = URL.createObjectURL(file);
+    try {
+      await engine.loadImage(url);
+      setActiveSource('src-image');
+      $('source-hint').textContent = file.name;
+      showToast(`✓ ${file.name} loaded`);
+    } catch (_) { showToast('Failed to load image'); }
+  });
+
+  /* ── SVG Shape ──────────────────────────────── */
+  $('svg-upload-btn').addEventListener('click', () => $('svg-file-input').click());
+
+  $('svg-file-input').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      const img = await engine.loadSVGShape(file);
+      // Show preview
+      const preview = $('svg-preview');
+      preview.innerHTML = '';
+      const previewImg = document.createElement('img');
+      previewImg.src = engine.svgDataURL;
+      const lbl = document.createElement('span');
+      lbl.className = 'svg-preview-label'; lbl.textContent = 'SVG';
+      preview.appendChild(previewImg);
+      preview.appendChild(lbl);
+      showToast(`✓ SVG loaded — ${file.name}`);
+    } catch (_) {
+      showToast('Failed to load SVG'); 
+    }
+  });
+
+  $('svg-clear-btn').addEventListener('click', () => {
+    engine.clearSVGShape();
+    const preview = $('svg-preview');
+    preview.innerHTML = '<span class="svg-preview-hint">No shape loaded</span>';
+    showToast('SVG shape cleared');
+  });
+
+  $('svg-tint').addEventListener('change', e => engine.setTintSVG(e.target.checked));
+
+  /* ── Render Mode ────────────────────────────── */
+  document.querySelectorAll('.rmode-btn').forEach(btn => {
+    btn.addEventListener('click', () => switchRenderMode(btn.dataset.rmode));
+  });
+
+  /* ── Halftone controls ──────────────────────── */
+  const wireSlider = (id, valId, setter, fmt) => {
+    const el = $(id), vel = $(valId); if (!el) return;
+    el.addEventListener('input', () => {
+      const v = parseFloat(el.value);
+      if (vel) vel.textContent = fmt ? fmt(v) : v.toFixed(2);
+      setter(v);
+    });
+  };
+
+  wireSlider('grid-cols',  'grid-cols-val',  v => { engine.setGridCols(v); syncGridInfo(); }, v => v|0);
+  wireSlider('dot-scale',  'dot-scale-val',  v => engine.setDotScale(v));
+  wireSlider('dot-opacity','dot-opacity-val',v => engine.setDotOpacity(v));
+
+  document.querySelectorAll('[data-shape]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-shape]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active'); engine.setShape(btn.dataset.shape);
+    });
+  });
+
+  $('invert-lum').addEventListener('change', e => engine.setInvertLum(e.target.checked));
+
+  /* ── Monotone ────────────────────────────────── */
+  $('monotone-toggle').addEventListener('change', e => {
+    const on = e.target.checked;
+    engine.monotone = on;
+    engine.svgCache.clear(); // invalidate cached shapes (state 6 replaces graduated)
+    $('monotone-thr-group').style.display = on ? '' : 'none';
+    showToast(on ? '◼ Monotone ON — flat binary color' : '◎ Monotone OFF — graduated halftone');
+  });
+
+  wireSlider('monotone-thr', 'monotone-thr-val', v => {
+    engine.monotoneThr = v / 100;
+    engine.svgCache.clear();
+  }, v => `${v | 0}%`);
+
+  /* ── Colors ─────────────────────────────────── */
+  const wireColor = (inputId, hexId, setter) => {
+    const el = $(inputId), hex = $(hexId); if (!el) return;
+    el.addEventListener('input', () => { hex.textContent = el.value; setter(el.value); });
+    $(inputId + '-wrap')?.addEventListener('click', () => el.click());
+  };
+  wireColor('dot-color', 'dot-color-hex', v => engine.setDotColor(v));
+  wireColor('bg-color',  'bg-color-hex',  v => { engine.bgColor = v; });
+
+  /* ── Low Poly controls ──────────────────────── */
+  wireSlider('lp-cols',   'lp-cols-val',   v => { engine.lpCols = v|0; engine._lpDirty = true; }, v => v|0);
+  wireSlider('lp-jitter', 'lp-jitter-val', v => { engine.lpJitter = v; engine._lpDirty = true; });
+
+  $('lp-image-color').addEventListener('change', e => engine.lpUseImageColor = e.target.checked);
+  $('lp-edges').addEventListener('change',       e => engine.lpShowEdges = e.target.checked);
+  $('lp-regen').addEventListener('click', () => {
+    engine._lpDirty = true;
+    engine.computeLowPolyMesh();
+    showToast('↺ New mesh generated');
+  });
+
+  /* ── Guided Structure controls ──────────────── */
+  wireSlider('guided-cols',      'guided-cols-val',      v => { engine.guidedCols = v|0; }, v => v|0);
+  wireSlider('guided-threshold', 'guided-threshold-val', v => { engine.guidedThreshold = v/100; }, v => `${v|0}%`);
+
+  document.querySelectorAll('[data-tiling]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('[data-tiling]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active'); engine.guidedTiling = btn.dataset.tiling;
+    });
+  });
+
+  $('guided-scale-lum').addEventListener('change', e => engine.guidedScaleLum = e.target.checked);
+
+  /* ── Shape Fill controls ─────────────────────── */
+  // Pattern SVG upload
+  $('sf-pattern-btn').addEventListener('click', () => $('sf-pattern-input').click());
+  $('sf-pattern-input').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      await engine.loadSFPatternSVG(file);
+      const prev = $('sf-pattern-preview');
+      prev.innerHTML = '';
+      const img = document.createElement('img'); img.src = engine.sfPatternDataURL;
+      const lbl = document.createElement('span'); lbl.className = 'svg-preview-label'; lbl.textContent = 'SVG';
+      prev.appendChild(img); prev.appendChild(lbl);
+      showToast(`✓ Pattern: ${file.name}`);
+    } catch (_) { showToast('Failed to load pattern SVG'); }
+    e.target.value = '';
+  });
+  $('sf-pattern-clear').addEventListener('click', () => {
+    engine.sfPatternSVG = null; engine.sfPatternDataURL = null;
+    $('sf-pattern-preview').innerHTML = '<span class="svg-preview-hint">No pattern loaded</span>';
+    showToast('Pattern cleared');
+  });
+
+  // Body SVG upload
+  $('sf-body-btn').addEventListener('click', () => $('sf-body-input').click());
+  $('sf-body-input').addEventListener('change', async e => {
+    const file = e.target.files[0]; if (!file) return;
+    try {
+      await engine.loadSFBodySVG(file);
+      const prev = $('sf-body-preview');
+      prev.innerHTML = '';
+      const img = document.createElement('img'); img.src = engine.sfBodyDataURL;
+      const lbl = document.createElement('span'); lbl.className = 'svg-preview-label'; lbl.textContent = 'BODY';
+      prev.appendChild(img); prev.appendChild(lbl);
+      showToast(`✓ Body mask: ${file.name}`);
+    } catch (_) { showToast('Failed to load body SVG'); }
+    e.target.value = '';
+  });
+  $('sf-body-clear').addEventListener('click', () => {
+    engine.sfBodySVG = null; engine.sfBodyDataURL = null; engine.sfBodyData = null;
+    $('sf-body-preview').innerHTML = '<span class="svg-preview-hint">No body loaded</span>';
+    showToast('Body mask cleared');
+  });
+
+  // SF sliders
+  wireSlider('sf-grid-cols',    'sf-grid-cols-val',    v => { engine.sfGridCols = v | 0; },           v => v | 0);
+  wireSlider('sf-pattern-scale',   'sf-pattern-scale-val',    v => { engine.sfPatternScale    = v; });
+  wireSlider('sf-pattern-rotation','sf-pattern-rotation-val', v => { engine.sfPatternRotation = v; }, v => `${v | 0}°`);
+  wireSlider('sf-threshold',    'sf-threshold-val',    v => { engine.sfThreshold = v; _rerasterize(); }, v => v | 0);
+  wireSlider('sf-body-opacity', 'sf-body-opacity-val', v => { engine.sfBodyOpacity = v; });
+
+  function _rerasterize() { if (engine.sfBodySVG) engine._rasterizeBodySVG(); }
+
+  // SF color
+  const sfBodyColorEl  = $('sf-body-color');
+  const sfBodyColorHex = $('sf-body-color-hex');
+  sfBodyColorEl.addEventListener('input', () => { sfBodyColorHex.textContent = sfBodyColorEl.value; engine.sfBodyColor = sfBodyColorEl.value; });
+  $('sf-body-color-wrap').addEventListener('click', () => sfBodyColorEl.click());
+
+  // SF switches
+  $('sf-show-body').addEventListener('change', e => {
+    engine.sfShowBody = e.target.checked;
+    $('sf-body-opacity-group').style.display = e.target.checked ? '' : 'none';
+  });
+  $('sf-tint-body').addEventListener('change',    e => engine.sfTintBody    = e.target.checked);
+  $('sf-tint-pattern').addEventListener('change', e => engine.sfTintPattern = e.target.checked);
+
+
+  /* ── Physics ────────────────────────────────── */
+  const agBtn      = $('ag-toggle');
+  const agControls = $('ag-controls');
+  const agBadge    = $('dp-mode-badge');
+
+  agBtn.addEventListener('click', () => {
+    const on = !engine.antiGravity;
+    engine.setAntiGravity(on);
+    agBtn.classList.toggle('active', on);
+    agBtn.setAttribute('aria-pressed', on);
+    agControls.classList.toggle('visible', on);
+    agBadge.classList.toggle('visible', on);
+    showToast(on ? '⬆ Anti-Gravity ON!' : '↓ Particles snapping back');
+  });
+
+  wireSlider('buoyancy',     'buoyancy-val',   v => engine.buoyancy     = v);
+  wireSlider('drag-force',   'drag-val',       v => engine.drag         = v);
+  wireSlider('repulsion-str','repulsion-val',  v => engine.repulsionStr = v, v => v|0);
+  wireSlider('repulsion-r',  'repulsion-r-val',v => engine.repulsionR   = v, v => `${v|0}px`);
+  wireSlider('turbulence',   'turbulence-val', v => engine.turbulence   = v);
+  wireSlider('snap-str',     'snap-val',       v => engine.snapStrength = v);
+
+  // SVG Shape rotation (declared after wireSlider is available)
+  wireSlider('svg-rotation', 'svg-rotation-val', v => {
+    engine.svgRotation = v;
+    engine.svgCache.clear();
+  }, v => `${v | 0}°`);
+
+  /* ── Export ─────────────────────────────────── */
+  $('export-png-btn').addEventListener('click', () => {
+    const a = document.createElement('a');
+    a.href = engine.exportFrame();
+    a.download = `ditherpat_${engine.renderMode}_${Date.now()}.png`;
+    a.click();
+    showToast('✓ PNG exported');
+  });
+
+  $('export-svg-btn').addEventListener('click', () => {
+    showToast('Building SVG…', 1200);
+    // Give the toast time to show before the potentially blocking SVG build
+    setTimeout(() => {
+      try {
+        engine.exportSVG();
+        const counts = {
+          halftone: `${engine.particles.filter(p => p.state > 0).length.toLocaleString()} shapes`,
+          lowpoly:  `${engine.lpTriangles.length.toLocaleString()} triangles`,
+          guided:   `${engine.guidedCols}×${Math.round(engine.guidedCols * engine.canvas.height / engine.canvas.width)} cells`,
+        };
+        showToast(`✓ SVG exported — ${counts[engine.renderMode]}`);
+      } catch (err) {
+        console.error('[DitherPat] SVG export error:', err);
+        showToast('SVG export failed — see console');
+      }
+    }, 80);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', initEngine);
+</script>
+</body>
+</html>

@@ -8,7 +8,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;700;800&family=Inter:wght@300;400;500;600&family=Bebas+Neue&family=Anton&family=Fjalla+One&family=Barlow+Condensed:wght@400;600;800&family=Rokkitt:wght@400;700;900&family=Zilla+Slab:wght@400;700&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,700&family=Cormorant+Garamond:ital,wght@0,400;1,400;1,700&family=DM+Sans:wght@400;700;800&family=Righteous&family=Abril+Fatface&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -16,10 +16,11 @@
   <!-- ── Top Navigation Bar ───────────────────────── -->
   <nav class="topbar" role="banner">
     <div class="brand">
-      <span class="brand-dot"></span>
+      <span class="brand-dot" aria-hidden="true"></span>
       <span class="brand-name">RASTER.PRESS</span>
     </div>
-    <span class="topbar-hint">Click letter to select &nbsp;&middot;&nbsp; Drag to move &nbsp;&middot;&nbsp; Arrow keys nudge &nbsp;&middot;&nbsp; Ctrl+S export</span>
+    <span class="topbar-hint">Select &thinsp;&middot;&thinsp; Drag &thinsp;&middot;&thinsp; Arrow keys &thinsp;&middot;&thinsp; Ctrl+S export</span>
+    <a href="./ditherpat.html" style="margin-left:auto;font-size:11px;font-weight:700;color:var(--paper-3);text-decoration:none;letter-spacing:0.10em;text-transform:uppercase;transition:color 200ms ease;padding:4px 10px;border:1px solid var(--paper-4);border-radius:2px;" onmouseover="this.style.color='var(--paper)';this.style.borderColor='var(--paper-3)'" onmouseout="this.style.color='var(--paper-3)';this.style.borderColor='var(--paper-4)'">DitherPat →</a>
   </nav>
 
   <!-- ── Main Application Layout ──────────────────── -->
@@ -27,6 +28,7 @@
 
     <!-- Left Control Panel -->
     <aside class="control-panel" role="complementary" aria-label="Controls">
+      <div class="panel-scroll-area">
       <div class="panel-title">Controls</div>
 
       <!-- ── Per-Letter Panel (hidden by default) ── -->
@@ -75,6 +77,25 @@
             <label class="control-label" for="pl-fill-char">Fill Character Override</label>
             <input type="text" id="pl-fill-char" class="text-input" value="O" maxlength="2"
                    placeholder="Single char" autocomplete="off" spellcheck="false">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="pl-kerning">
+              Kerning
+              <span class="hint-inline">(space before letter)</span>
+              <span class="value-badge" id="pl-kerning-val">0.00</span>
+            </label>
+            <input type="range" id="pl-kerning" class="slider" min="-0.5" max="0.5" value="0" step="0.01">
+          </div>
+
+          <div class="control-group">
+            <label class="control-label" for="pl-cell-size">
+              Cell Size
+              <span class="hint-inline">(re-rasterizes letter)</span>
+              <span class="value-badge" id="pl-cell-size-val">Global</span>
+            </label>
+            <input type="range" id="pl-cell-size" class="slider" min="20" max="110" value="57" step="1">
+            <button class="btn-cell-global" id="cell-size-global-btn">↺ Use Global</button>
           </div>
 
           <div class="pl-actions">
@@ -140,12 +161,12 @@
           </div>
 
           <div class="control-group">
-            <label class="control-label" for="letter-spacing">
+            <label class="control-label" for="tracking">
               Tracking
-              <span class="hint-inline">(letter spacing)</span>
-              <span class="value-badge" id="letter-spacing-val">4px</span>
+              <span class="hint-inline">(% of cell size)</span>
+              <span class="value-badge" id="tracking-val">7%</span>
             </label>
-            <input type="range" id="letter-spacing" class="slider" min="-20" max="60" value="4" step="1">
+            <input type="range" id="tracking" class="slider" min="-0.30" max="1.00" value="0.07" step="0.01">
           </div>
 
           <div class="control-group">
@@ -246,16 +267,82 @@
 
         <div class="panel-divider"></div>
 
-        <!-- Presets Section -->
-        <div class="section-block">
-          <div class="section-label">Color Presets</div>
-          <div class="preset-pills">
-            <button class="preset-pill active" data-preset="Blue / Black">Blue</button>
-            <button class="preset-pill" data-preset="Red / White">Red</button>
-            <button class="preset-pill" data-preset="Gold / Black">Gold</button>
-            <button class="preset-pill" data-preset="Mono">Mono</button>
-            <button class="preset-pill" data-preset="Neon">Neon</button>
+        <!-- ── Gradient Layer Section ── -->
+        <div class="section-block" id="gradient-layer-section">
+          <div class="gl-header">
+            <div class="section-label" style="margin-bottom:0">Gradient Layer</div>
+            <label class="switch" title="Enable gradient layer">
+              <input type="checkbox" id="gl-toggle">
+              <span class="switch-track"></span>
+            </label>
           </div>
+
+          <div id="gl-body" style="display:none;">
+
+            <!-- Opacity -->
+            <div class="control-group" style="margin-top:12px">
+              <label class="control-label" for="gl-opacity">
+                Opacity
+                <span class="value-badge" id="gl-opacity-val">100%</span>
+              </label>
+              <input type="range" id="gl-opacity" class="slider" min="0" max="1" value="1" step="0.01">
+            </div>
+
+            <!-- Blend target -->
+            <div class="control-group">
+              <label class="control-label">Apply To</label>
+              <div class="layout-toggle" role="group">
+                <button class="toggle-btn" data-blend="bg" id="gl-blend-bg">BG</button>
+                <button class="toggle-btn" data-blend="fill" id="gl-blend-fill">Fill</button>
+                <button class="toggle-btn active" data-blend="both" id="gl-blend-both">Both</button>
+              </div>
+            </div>
+
+            <!-- Brush size -->
+            <div class="control-group">
+              <label class="control-label" for="gl-brush">
+                Brush Size
+                <span class="value-badge" id="gl-brush-val">16px</span>
+              </label>
+              <input type="range" id="gl-brush" class="slider" min="4" max="80" value="16" step="2">
+            </div>
+
+            <!-- Grain -->
+            <div class="control-group">
+              <label class="control-label" for="gl-grain">
+                Grain
+                <span class="value-badge" id="gl-grain-val">0%</span>
+              </label>
+              <input type="range" id="gl-grain" class="slider" min="0" max="1" value="0" step="0.01">
+            </div>
+
+            <!-- Stroke groups list -->
+            <div class="control-group">
+              <label class="control-label">Stroke Colors</label>
+              <div id="gl-group-list" class="gl-group-list" aria-live="polite"></div>
+              <button class="gl-add-btn" id="gl-add-group">
+                <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+                  <path d="M5.5 1v9M1 5.5h9" stroke="currentColor" stroke-width="1.5" stroke-linecap="square"/>
+                </svg>
+                Add Color
+              </button>
+            </div>
+
+            <!-- Paint mode hint -->
+            <p class="hint gl-hint" id="gl-mode-hint">Click a [Draw] button then paint on the canvas. Press Esc to stop.</p>
+
+            <!-- Clear -->
+            <button class="btn btn-secondary" id="gl-clear" style="margin-top:4px">
+              Clear All Strokes
+            </button>
+
+          </div>
+        </div>
+
+
+        <div class="section-block">
+          <div class="section-label">Aesthetics</div>
+          <div class="aesthetic-grid" id="aesthetic-grid"></div>
         </div>
 
         <div class="panel-divider"></div>
@@ -278,7 +365,7 @@
             <div class="align-toggle" role="group" aria-label="Baseline alignment">
               <button class="toggle-btn" data-align="top">Top</button>
               <button class="toggle-btn" data-align="center">Center</button>
-              <button class="toggle-btn active" data-align="bottom">Bottom</button>
+              <button class="toggle-btn active" data-align="bottom">Baseline</button>
             </div>
           </div>
 
@@ -315,13 +402,35 @@
           <div class="control-group">
             <label class="control-label" for="font-family">Typeface</label>
             <select id="font-family" class="select-input">
-              <option value="Space Mono">Space Mono — Monospace</option>
-              <option value="Syne">Syne — Display</option>
-              <option value="Inter">Inter — Sans-serif</option>
-              <option value="Arial">Arial — Sans-serif</option>
-              <option value="Georgia">Georgia — Serif</option>
-              <option value="Impact">Impact — Display</option>
-              <option value="monospace">Monospace — System</option>
+              <optgroup label="─ Condensed Impact ─">
+                <option value="Bebas Neue">Bebas Neue</option>
+                <option value="Anton">Anton</option>
+                <option value="Fjalla One">Fjalla One</option>
+                <option value="Barlow Condensed">Barlow Condensed</option>
+              </optgroup>
+              <optgroup label="─ Geometric Slab ─">
+                <option value="Rokkitt">Rokkitt</option>
+                <option value="Zilla Slab">Zilla Slab</option>
+              </optgroup>
+              <optgroup label="─ Humanist Display ─">
+                <option value="Playfair Display">Playfair Display</option>
+                <option value="Cormorant Garamond">Cormorant Garamond</option>
+              </optgroup>
+              <optgroup label="─ Grotesque / Neo ─">
+                <option value="DM Sans">DM Sans</option>
+                <option value="Space Mono" selected>Space Mono</option>
+                <option value="Syne">Syne</option>
+                <option value="Inter">Inter</option>
+              </optgroup>
+              <optgroup label="─ Expressive ─">
+                <option value="Righteous">Righteous</option>
+                <option value="Abril Fatface">Abril Fatface</option>
+              </optgroup>
+              <optgroup label="─ System ─">
+                <option value="Arial">Arial</option>
+                <option value="Georgia">Georgia</option>
+                <option value="Impact">Impact</option>
+              </optgroup>
             </select>
           </div>
         </div>
@@ -366,17 +475,21 @@
       <!-- Panel spacer -->
       <div class="panel-spacer"></div>
 
-      <!-- Action Buttons -->
-      <button class="btn btn-primary" id="download-btn">
-        <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path d="M10 12.586L6.707 9.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L11 12.586V3a1 1 0 10-2 0v9.586z"/>
-          <path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/>
-        </svg>
-        Download PNG
-      </button>
-      <button class="btn btn-secondary" id="reset-btn">
-        Reset to Default
-      </button>
+      </div><!-- end panel-scroll-area -->
+
+      <!-- Action Buttons (always visible, outside scroll area) -->
+      <div class="panel-footer">
+        <button class="btn btn-primary" id="download-btn">
+          <svg class="btn-icon" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path d="M10 12.586L6.707 9.293a1 1 0 00-1.414 1.414l4 4a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L11 12.586V3a1 1 0 10-2 0v9.586z"/>
+            <path d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z"/>
+          </svg>
+          Download PNG
+        </button>
+        <button class="btn btn-secondary" id="reset-btn">
+          Reset to Default
+        </button>
+      </div>
     </aside>
 
     <!-- Canvas Workspace -->
@@ -403,6 +516,7 @@
   <!-- Toast notification -->
   <div class="toast" id="toast" role="alert" aria-live="polite"></div>
 
+  <script src="gradient-engine.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
