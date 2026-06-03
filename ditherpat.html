@@ -655,7 +655,13 @@
             </label>
           </div>
 
-
+          <div class="switch-row">
+            <span class="control-label">Tint pattern with dot color</span>
+            <label class="switch">
+              <input type="checkbox" id="sf-tint-pattern" checked>
+              <span class="switch-track"></span>
+            </label>
+          </div>
 
           <p class="hint">Pattern color = Shape color in Color panel<br>Body BG picks are above</p>
         </div>
@@ -2274,6 +2280,7 @@ function initEngine() {
     $('sf-body-opacity-group').style.display = e.target.checked ? '' : 'none';
   });
   $('sf-tint-body').addEventListener('change',    e => engine.sfTintBody    = e.target.checked);
+  $('sf-tint-pattern').addEventListener('change', e => engine.sfTintPattern = e.target.checked);
 
 
 
