@@ -1477,15 +1477,15 @@ class DitherPatEngine {
     if (this.sfShowBody && this.sfBodySVG) {
       const opAttr = this.sfBodyOpacity < 1 ? ` opacity="${this.sfBodyOpacity.toFixed(2)}"` : '';
       if (this.sfBodySVG._rawText) {
-        // Vector body: use the #dp-sf-body symbol defined in <defs>
-        const tintFilt = this.sfTintBody
-          ? ` filter="url(#dp-sf-body-tint)"`
-          : '';
-        // Inline body-tint filter if needed (separate id from pattern tint)
+        // Vector body: use the #dp-sf-body group defined in <defs> with explicit scale
+        const tintFilt = this.sfTintBody ? ` filter="url(#dp-sf-body-tint)"` : '';
         if (this.sfTintBody) {
           lines.push(`<defs><filter id="dp-sf-body-tint"><feFlood flood-color="${this.sfBodyColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter></defs>`);
         }
-        lines.push(`<use href="#dp-sf-body" x="0" y="0" width="${cw}" height="${ch}"${tintFilt}${opAttr}/>`);
+        // Scale body SVG from natural dims to canvas size
+        const [nw, nh] = this._exportBodyDims || [cw, ch];
+        const scaleX = (cw / nw).toFixed(4), scaleY = (ch / nh).toFixed(4);
+        lines.push(`<use href="#dp-sf-body" transform="scale(${scaleX},${scaleY})"${tintFilt}${opAttr}/>`);
       } else {
         // Fallback: rasterized PNG (old behavior for non-text-loaded bodies)
         const bTmp = document.createElement('canvas');
@@ -1525,12 +1525,20 @@ class DitherPatEngine {
         const sx = px - sw * 0.5;
         const sy = py - sh * 0.5;
 
-        if (this.sfPatternSVG) {
-          // Vector: <use> referencing the #dp-sf-pat symbol in <defs>
-          const rotAttr = this.sfPatternRotation
-            ? ` transform="rotate(${this.sfPatternRotation},${f(px)},${f(py)})"`
-            : '';
-          shapes.push(`<use href="#dp-sf-pat" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"${tintFilt}${rotAttr}/>`);
+        if (this.sfPatternSVG && this._exportPatDims) {
+          // Vector: explicit transform scale from natural dims to display size
+          const [nw, nh] = this._exportPatDims;
+          let xfm;
+          if (this.sfPatternRotation) {
+            // Rotate around tile center, then position
+            xfm = `translate(${f(px)},${f(py)}) rotate(${this.sfPatternRotation}) translate(${f(-sw*0.5)},${f(-sh*0.5)}) scale(${f(sw/nw)},${f(sh/nh)})`;
+          } else {
+            xfm = `translate(${f(sx)},${f(sy)}) scale(${f(sw/nw)},${f(sh/nh)})`;
+          }
+          shapes.push(`<use href="#dp-sf-pat" transform="${xfm}"${tintFilt}/>`);
+        } else if (this.sfPatternSVG) {
+          // _exportPatDims not available (fallback): use basic positioning
+          shapes.push(`<use href="#dp-sf-pat" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"${tintFilt}/>`);
         } else {
           // Fallback: built-in circle
           const r2 = Math.min(cellW, cellH) * 0.5 * this.sfPatternScale;
@@ -1782,29 +1790,41 @@ class DitherPatEngine {
      Guided    → transformed <g> per visible cell, rotated shape
      Custom SVG shape embedded as <image> with optional tint filter.
      ═══════════════════════════════════════════════ */
+
+  /** Parse natural width/height from raw SVG text (viewBox takes priority). */
+  _getSVGDims(rawText) {
+    if (!rawText) return [100, 100];
+    // viewBox="minX minY width height"
+    const vb = rawText.match(/viewBox=["']\s*[\d.e+\-]+\s+[\d.e+\-]+\s+([\d.e+\-]+)\s+([\d.e+\-]+)/i);
+    if (vb) return [parseFloat(vb[1]), parseFloat(vb[2])];
+    // Fall back to width= height= attributes
+    const w = rawText.match(/\bwidth=["']([\d.]+)/i)?.[1];
+    const h = rawText.match(/\bheight=["']([\d.]+)/i)?.[1];
+    return [parseFloat(w) || 100, parseFloat(h) || 100];
+  }
+
   exportSVG() {
     const cw      = this.canvas.width;
     const ch      = this.canvas.height;
     const imgData = this._sampleSource();
     const lines   = [];
-    const f       = n => n.toFixed(2);
+    const f       = n => n.toFixed(3);
 
     lines.push(`<?xml version="1.0" encoding="UTF-8"?>`);
     lines.push(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${cw} ${ch}" width="${cw}" height="${ch}">`);
 
-    /* ── <defs> block ─────────────────────────────────────────────
-       • Tint filter(s)  – feFlood + composite
-       • #dp-shape       – uploaded halftone/guided SVG as a symbol
-       • #dp-sf-pattern  – uploaded shape-fill pattern SVG as symbol
-       • #dp-sf-body     – uploaded shape-fill body SVG as symbol
+    /* ── <defs> block ────────────────────────────────────────────
+       Strategy: store uploaded SVGs as <g id="..."> (NOT <symbol>).
+       Every <use> will carry an explicit transform="translate() scale()"
+       so scaling is always deterministic — no reliance on viewBox parsing
+       to set symbol viewport.
     ─────────────────────────────────────────────────────────────── */
     const defs = [];
 
-    // Helper: extract inner SVG content from raw text, strip outer <svg> wrapper
-    const svgInner = rawText => {
-      if (!rawText) return '';
-      // Remove XML declaration and strip outer <svg …> … </svg> wrapper
-      return rawText
+    // Helper: strip outer <svg> wrapper, keep inner content only
+    const svgInner = raw => {
+      if (!raw) return '';
+      return raw
         .replace(/<\?xml[^>]*\?>/i, '')
         .replace(/<!--[\s\S]*?-->/g, '')
         .trim()
@@ -1813,43 +1833,35 @@ class DitherPatEngine {
         .trim();
     };
 
-    // Tint filter for halftone/guided shape SVG
-    const hasSVGShape   = !!(this.svgImage && this.svgRawText);
-    const hasSFPattern  = (this.renderMode === 'shapefill' && this.sfPatternSVG);
-    const hasSFBody     = (this.renderMode === 'shapefill' && this.sfBodySVG);
-    const needsShapeTint = hasSVGShape && this.tintSVG;
-    const needsSFTint    = hasSFPattern && this.sfTintPattern;
+    const hasSVGShape  = !!(this.svgImage && this.svgRawText);
+    const hasSFPattern = (this.renderMode === 'shapefill' && this.sfPatternSVG?._rawText);
+    const hasSFBody    = (this.renderMode === 'shapefill' && this.sfBodySVG?._rawText);
 
-    if (needsShapeTint) {
+    // Tint filters
+    if (hasSVGShape && this.tintSVG) {
       defs.push(`<filter id="dp-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
     }
-    if (needsSFTint) {
+    if (hasSFPattern && this.sfTintPattern) {
       defs.push(`<filter id="dp-sf-tint"><feFlood flood-color="${this.dotColor}" result="c"/><feComposite in="c" in2="SourceGraphic" operator="in"/></filter>`);
     }
 
-    // Shape symbol (halftone / guided / low-poly custom shape)
+    // Shape groups — stored as <g id> so <use transform> gives exact control
     if (hasSVGShape) {
-      // Parse viewBox from raw SVG to set symbol viewBox
-      const vbMatch = this.svgRawText.match(/viewBox=["']([^"']+)["']/i);
-      const vbAttr  = vbMatch ? ` viewBox="${vbMatch[1]}"` : ' viewBox="0 0 100 100"';
-      defs.push(`<symbol id="dp-shape"${vbAttr} preserveAspectRatio="xMidYMid meet">${svgInner(this.svgRawText)}</symbol>`);
+      defs.push(`<g id="dp-shape">${svgInner(this.svgRawText)}</g>`);
     }
-
-    // Shape-fill pattern symbol
-    if (hasSFPattern && this.sfPatternSVG._rawText) {
-      const vbMatch = this.sfPatternSVG._rawText.match(/viewBox=["']([^"']+)["']/i);
-      const vbAttr  = vbMatch ? ` viewBox="${vbMatch[1]}"` : ' viewBox="0 0 100 100"';
-      defs.push(`<symbol id="dp-sf-pat"${vbAttr} preserveAspectRatio="xMidYMid meet">${svgInner(this.sfPatternSVG._rawText)}</symbol>`);
+    if (hasSFPattern) {
+      defs.push(`<g id="dp-sf-pat">${svgInner(this.sfPatternSVG._rawText)}</g>`);
     }
-
-    // Shape-fill body symbol
-    if (hasSFBody && this.sfBodySVG._rawText) {
-      const vbMatch = this.sfBodySVG._rawText.match(/viewBox=["']([^"']+)["']/i);
-      const vbAttr  = vbMatch ? ` viewBox="${vbMatch[1]}"` : ' viewBox="0 0 100 100"';
-      defs.push(`<symbol id="dp-sf-body"${vbAttr} preserveAspectRatio="xMidYMid meet">${svgInner(this.sfBodySVG._rawText)}</symbol>`);
+    if (hasSFBody) {
+      defs.push(`<g id="dp-sf-body">${svgInner(this.sfBodySVG._rawText)}</g>`);
     }
 
     if (defs.length) lines.push(`<defs>${defs.join('')}</defs>`);
+
+    // Stash natural dims so sub-methods can compute exact scale transforms
+    this._exportShapeDims = hasSVGShape  ? this._getSVGDims(this.svgRawText)             : null;
+    this._exportPatDims   = hasSFPattern ? this._getSVGDims(this.sfPatternSVG._rawText)  : null;
+    this._exportBodyDims  = hasSFBody    ? this._getSVGDims(this.sfBodySVG._rawText)     : null;
 
     // Background rectangle
     lines.push(`<rect width="${cw}" height="${ch}" fill="${this.bgColor}"/>`);
@@ -1861,6 +1873,9 @@ class DitherPatEngine {
       case 'guided':    this._svgExportGuided(lines, imgData, cw, ch); break;
       case 'shapefill': this._svgExportShapeFill(lines, cw, ch); break;
     }
+
+    // Cleanup temp state
+    this._exportShapeDims = this._exportPatDims = this._exportBodyDims = null;
 
     lines.push(`</svg>`);
 
@@ -1882,16 +1897,26 @@ class DitherPatEngine {
     const maxR  = Math.min(cellW, cellH) * 0.5 * this.dotScale;
     const r     = state < 6 ? maxR * frac : maxR;
     const hw    = cellW * 0.5, hh = cellH * 0.5;
-    const f     = n => n.toFixed(2);
+    const f     = n => n.toFixed(3);
 
-    // Uploaded SVG shape → <use href="#dp-shape"> (true vector via symbol defined in <defs>)
-    if (this.svgImage) {
-      const sz   = (state < 6 ? frac : 1) * this.dotScale;
-      const sw   = cellW * sz, sh = cellH * sz;
-      const sx   = cx - sw * 0.5, sy = cy - sh * 0.5;
+    // Uploaded SVG shape → <use> with explicit transform="translate() scale()"
+    if (this.svgImage && this._exportShapeDims) {
+      const [nw, nh] = this._exportShapeDims;
+      const sz  = (state < 6 ? frac : 1) * this.dotScale;
+      const sw  = cellW * sz, sh = cellH * sz;
+      // Build transform: scale from natural dims to display size, then place at (cx,cy)
+      // With optional rotation around center
+      const sx  = sw / nw, sy = sh / nh;
+      const tx  = cx - sw * 0.5, ty = cy - sh * 0.5;
       const filt = this.tintSVG ? ' filter="url(#dp-tint)"' : '';
-      const rot  = this.svgRotation ? ` transform="rotate(${this.svgRotation},${f(cx)},${f(cy)})"` : '';
-      return `<use href="#dp-shape" x="${f(sx)}" y="${f(sy)}" width="${f(sw)}" height="${f(sh)}"${filt}${rot}/>`;
+      let xfm;
+      if (this.svgRotation) {
+        // Rotate around cell center, then position
+        xfm = `translate(${f(cx)},${f(cy)}) rotate(${this.svgRotation}) translate(${f(-sw*0.5)},${f(-sh*0.5)}) scale(${f(sx)},${f(sy)})`;
+      } else {
+        xfm = `translate(${f(tx)},${f(ty)}) scale(${f(sx)},${f(sy)})`;
+      }
+      return `<use href="#dp-shape" transform="${xfm}"${filt}/>`;
     }
 
     // Built-in shapes (already vector — no change)
@@ -1969,14 +1994,15 @@ class DitherPatEngine {
         opAttr = ` opacity="${(lum / 255 * this.dotOpacity).toFixed(2)}"`;
       }
 
-      // Custom SVG shape: clip triangle, fill with vector <use> of #dp-shape
-      if (this.svgImage) {
+      // Custom SVG shape: scale to canvas size, clip to triangle
+      if (this.svgImage && this._exportShapeDims) {
+        const [nw, nh] = this._exportShapeDims;
         const clipId = `cl${i}`;
         const pts    = `${f(a.x)},${f(a.y)} ${f(b.x)},${f(b.y)} ${f(c.x)},${f(c.y)}`;
         const filt   = this.tintSVG ? ` filter="url(#dp-tint)"` : '';
         lines.push(`<clipPath id="${clipId}"><polygon points="${pts}"/></clipPath>`);
-        // Tile the symbol across the full canvas, clipped to triangle
-        lines.push(`<use href="#dp-shape" x="0" y="0" width="${cw}" height="${ch}" clip-path="url(#${clipId})"${filt}${opAttr}/>`);
+        // Scale shape to fill canvas, then clip to triangle
+        lines.push(`<use href="#dp-shape" transform="scale(${(cw/nw).toFixed(4)},${(ch/nh).toFixed(4)})" clip-path="url(#${clipId})"${filt}${opAttr}/>`);
         if (this.lpShowEdges) {
           lines.push(`<polygon points="${pts}" fill="none" stroke="${this.bgColor}" stroke-width="0.5"/>`);
         }
@@ -2027,10 +2053,12 @@ class DitherPatEngine {
         const xfm = `translate(${f(px)},${f(py)})${rot}`;
 
         let shapeEl;
-        if (this.svgImage) {
+        if (this.svgImage && this._exportShapeDims) {
+          const [nw, nh] = this._exportShapeDims;
           const filt = this.tintSVG ? ' filter="url(#dp-tint)"' : '';
-          // <use> references the #dp-shape symbol — true vector, no raster
-          shapeEl = `<use href="#dp-shape" x="${f(-hw)}" y="${f(-hh)}" width="${f(hw*2)}" height="${f(hh*2)}"${filt}/>`;
+          // Local <g> is centered at (px,py). Content (0..nw, 0..nh) must map to (-hw..-hw+sw, -hh..-hh+sh).
+          // transform: translate(-hw,-hh) scale(hw*2/nw, hh*2/nh)
+          shapeEl = `<use href="#dp-shape" transform="translate(${f(-hw)},${f(-hh)}) scale(${(hw*2/nw).toFixed(4)},${(hh*2/nh).toFixed(4)})"${filt}/>`;
         } else {
           shapeEl = this._svgBuiltinLocal(hw, hh);
         }
